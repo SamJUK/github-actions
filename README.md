@@ -13,9 +13,9 @@ This repository contains production ready, reusable Github actions and workflows
 ## Workflows
 | Workflow | Description |
 | -------- | ----------- |
-| [magento2-test-lint](./github/workflows/magento2-test-lint.readme.md) | Handles linting a Magento 2 project to opinionated standards
-| [magento2-test-static](./github/workflows/magento2-test-static.readme.md) | Handles performing opinionated static analysis against a Magento 2 project 
-| [magento2-test-unit-module-ghas](./github/workflows/magento2-test-unit-module-ghas.readme.md) | Handles running Unit tests against a Magento module, using Github Actions Services
-| [magento2-test-unit-module-warden](./github/workflows/magento2-test-unit-module-warden.readme.md) | Handles running Unit tests against a Magento module using Warden
-| [magento2-test-unit-project-ghas](./github/workflows/magento2-test-unit-project-ghas.readme.md) | Handles running Unit tests against a Magento project, using Github Actions Services
-| [magento2-test-unit-project-warden](./github/workflows/magento2-test-unit-project-warden.readme.md) | Handles running Unit tests against a Magento project using Warden
+| [magento2-test-lint](./.github/workflows/magento2-test-lint.readme.md) | Handles linting a Magento 2 project to opinionated standards
+| [magento2-test-static](./.github/workflows/magento2-test-static.readme.md) | Handles performing opinionated static analysis against a Magento 2 project 
+| [magento2-test-unit-module-ghas](./.github/workflows/magento2-test-unit-module-ghas.readme.md) | Handles running Unit tests against a Magento module, using Github Actions Services
+| [magento2-test-unit-module-warden](./.github/workflows/magento2-test-unit-module-warden.readme.md) | Handles running Unit tests against a Magento module using Warden
+| [magento2-test-unit-project-ghas](./.github/workflows/magento2-test-unit-project-ghas.readme.md) | Handles running Unit tests against a Magento project, using Github Actions Services
+| [magento2-test-unit-project-warden](./.github/workflows/magento2-test-unit-project-warden.readme.md) | Handles running Unit tests against a Magento project using Warden
