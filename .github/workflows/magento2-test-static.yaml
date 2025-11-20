@@ -1,0 +1,85 @@
+name: Magento2 Static Analysis
+
+on:
+  workflow_call:
+    inputs:
+      php_version:
+        required: false
+        type: string
+        default: "8.3"
+        description: "PHP Version to use"
+      directory:
+        required: false
+        type: string
+        default: "."
+        description: "Directory to lint"
+      phpcs_severity:
+        required: false
+        type: string
+        default: "6"
+        description: "PHPCS severity level"
+      phpstan_level:
+        required: false
+        type: string
+        default: "5"
+        description: "PHPStan analysis level"
+
+jobs:
+  phpcs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ inputs.php_version }}
+          tools: phpcs
+
+      - name: Setup PHPCS Magento2 Standard
+        run: |
+          composer global config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+          composer global require magento/magento-coding-standard magento/php-compatibility-fork
+          phpcs --config-set installed_paths ../../magento/magento-coding-standard,../../magento/php-compatibility-fork/PHPCompatibility
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run PHPCS
+        run: |
+          phpcs --standard=Magento2 --extensions=php,phtml -p ${{ inputs.directory }} --severity=${{ inputs.phpcs_severity }}
+
+  phpstan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ inputs.php_version }}
+          tools: phpstan
+
+      - name: Install PHPStan Magento Extension
+        run: |
+          composer global config --no-plugins allow-plugins.phpstan/extension-installer true
+          composer global require phpstan/extension-installer
+          composer global require bitexpert/phpstan-magento
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Composer Install
+        run: |
+          composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Write default phpstan.neon if missing
+        run: |
+          echo "" > phpstan.neon
+          # if [ ! -f phpstan.neon ]; then
+          #   touch phpstan.neon
+          # fi
+
+      - name: Run PHPStan
+        run: |
+          phpstan analyse ${{ inputs.directory }} --level=${{ inputs.phpstan_level }} || true

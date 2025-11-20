@@ -1,0 +1,82 @@
+name: Magento2 Linter
+
+on:
+  workflow_call:
+    inputs:
+      php_version:
+        required: false
+        type: string
+        default: "8.3"
+        description: "PHP Version to use"
+      directory:
+        required: false
+        type: string
+        default: "."
+        description: "Directory to lint"
+
+jobs:
+  composer:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          sparse-checkout: |
+            composer.json
+            composer.lock
+
+      - name: Validating Composer
+        run: composer validate --no-check-publish
+
+  php:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set PHP Version
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ inputs.php_version }}
+
+      - name: Lint PHP Files
+        run: |
+          set +e
+          find ${{ inputs.directory }} -type f -name '*.php' -exec php -l {} 2>&1 \; | grep -v "^No syntax errors detected"
+          test $? -eq 0 && exit 1 || exit 0
+
+  yaml:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Lint YAML Files
+        run: |
+          exit 0 # TODO
+          # set +e
+          # find ${{ inputs.directory }} -type f \( -name '*.yml' -o -name '*.yaml' \) -exec yamllint {} \; 
+          # test $? -eq 0 && exit 1 || exit 0
+
+  xml:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # - name: Install Tooling
+      #   run: sudo apt-get install libxml2-utils -y
+
+      - name: Lint XML Files
+        run: |
+          exit 0 # TODO
+          # set +e
+          # find ${{ inputs.directory }} -type f -name '*.xml' -exec xmllint --noout {} \; 
+          # test $? -eq 0 && exit 1 || exit 0

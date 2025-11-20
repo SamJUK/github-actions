@@ -1,0 +1,49 @@
+name: Unit Tests - Project
+
+on:
+  workflow_call:
+    inputs:
+      test_directory:
+        description: 'Directory containing tests to run'
+        required: false
+        type: string
+        default: './extensions/${{ github.event.repository.name }}/Test/Unit'
+
+jobs:
+  unit-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Project
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Assert Warden is Configured
+        run: |
+            if [ ! -f ".env" ]; then
+              echo ".env file not found. Please configure Warden before running this workflow.";
+              exit 1;
+            fi
+
+      - name: Setup Warden Environment
+        uses: samjuk/github-actions/.github/actions/warden/setup-environment@master
+
+      - name: Environment Information
+        run: |
+          export WARDEN="$(pwd)/warden/bin/warden"
+          ${WARDEN} shell -c "php -v"
+          ${WARDEN} shell -c "composer --version"
+
+      - name: Create Magento Project
+        run: |
+          export WARDEN="$(pwd)/warden/bin/warden"
+          ${WARDEN} shell -c "sudo composer self-update --stable" # Temporary fix until 2.9.2 is the packaged version
+          ${WARDEN} shell -c "COMPOSER_NO_SECURITY_BLOCKING=1 composer install"
+
+      - name: Run Unit Tests
+        run: |
+          export WARDEN="$(pwd)/warden/bin/warden"
+          ${WARDEN} shell -c "vendor/bin/phpunit ${{ inputs.test_directory }}"
+
+  

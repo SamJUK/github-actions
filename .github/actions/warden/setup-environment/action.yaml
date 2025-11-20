@@ -1,0 +1,66 @@
+name: "Setup Warden"
+author: "SamJUK"
+description: "A Github Action that deploys a Warden Environment"
+
+inputs:
+  warden_version:
+    required: true
+    default: "0.15.0"
+    description: "The version of Warden to use."
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout Warden Repo
+      uses: actions/checkout@v4
+      with:
+        repository: wardenenv/warden
+        path: warden
+        ref: refs/tags/${{ inputs.warden_version }}
+
+    - name: Warden svc up && Warden env up
+      shell: bash
+      run: |
+          export WARDEN="$(pwd)/warden/bin/warden"
+          ${WARDEN} svc up 
+          ${WARDEN} env up
+
+    - name: Change Directory Permissions
+      shell: bash
+      run: |
+        export WARDEN="$(pwd)/warden/bin/warden"
+        ${WARDEN} shell -c "sudo chmod -R 777 ."
+
+    - name: Wait for environment to be ready
+      shell: bash
+      run: |
+        export WARDEN="$(pwd)/warden/bin/warden"
+        
+        eval "$(grep -iE "elasticsearch|opensearch" .env)"
+        if [[ "$WARDEN_ELASTICSEARCH" == "1" ]]; then
+          SEARCH_HOST="elasticsearch"
+        else
+          SEARCH_HOST="opensearch"
+        fi
+
+        HEALTHY=1
+        for ((i=1; i<=24; i++)); do
+          SEARCH_STATUS=$(${WARDEN} env exec -T php-fpm bash -c "curl --write-out %{http_code} --silent --output /dev/null http://${SEARCH_HOST}:9200/_cat/health?h=st; exit 0")
+          echo "search status: ${SEARCH_STATUS}"
+          if [ ${SEARCH_STATUS} -eq "200" ]; then
+            HEALTHY=0
+            break
+          fi
+          sleep 5
+        done
+        echo "HEALTHY: ${HEALTHY}"
+        exit ${HEALTHY}
+
+    - name: Setup Hosts Entry & Sign Certificate
+      shell: bash
+      run: |
+        eval "$(grep -iE "TRAEFIK_DOMAIN|TRAEFIK_SUBDOMAIN" .env)"
+        echo "127.0.0.1 $TRAEFIK_DOMAIN $TRAEFIK_SUBDOMAIN.$TRAEFIK_DOMAIN webmail.warden.test" | sudo tee -a /etc/hosts
+
+        export WARDEN="$(pwd)/warden/bin/warden"
+        ${WARDEN} sign-certificate $TRAEFIK_DOMAIN

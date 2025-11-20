@@ -1,0 +1,75 @@
+name: "Compute Magento Software Requirements"
+author: "SamJUK"
+description: "A Github Action computes Magento Software Requirements"
+
+inputs:
+  magento_version: 
+    description: "Magento Verison"
+    required: true
+
+outputs:
+  composer:
+    description: "Composer Version"
+    value: ${{ steps.extract-software-requirements.outputs.composer }}
+  php:
+    description: "PHP Version"
+    value: ${{ steps.extract-software-requirements.outputs.php }}
+  mysql:
+    description: "MySQL Version"
+    value: ${{ steps.extract-software-requirements.outputs.mysql }}
+  mariadb:
+    description: "MariaDB Version"
+    value: ${{ steps.extract-software-requirements.outputs.mariadb }}
+  elasticsearch:
+    description: "Elasticsearch Version"
+    value: ${{ steps.extract-software-requirements.outputs.elasticsearch }}
+  opensearch:
+    description: "OpenSearch Version"
+    value: ${{ steps.extract-software-requirements.outputs.opensearch }}
+  redis:
+    description: "Redis Version"
+    value: ${{ steps.extract-software-requirements.outputs.redis }}
+  valkey:
+    description: "Valkey Key Version"
+    value: ${{ steps.extract-software-requirements.outputs.valkey }}
+  apache:
+    description: "Apache Version"
+    value: ${{ steps.extract-software-requirements.outputs.apache }}
+  nginx:
+    description: "Nginx Version"
+    value: ${{ steps.extract-software-requirements.outputs.nginx }}
+  varnish:
+    description: "Varnish Version"
+    value: ${{ steps.extract-software-requirements.outputs.varnish }}
+  rabbitmq:
+    description: "RabbitMQ Version"
+    value: ${{ steps.extract-software-requirements.outputs.rabbitmq }}
+  activemq_artemis:
+    description: "ActiveMQ Artemis Version"
+    value: ${{ steps.extract-software-requirements.outputs.activemq_artemis }}
+
+runs:
+  using: composite
+  steps:
+    - name: Extract Software Requirements
+      id: extract-software-requirements
+      shell: bash
+      run: |
+        jq -r --arg v ${{ inputs.magento_version }} '.[$v] | to_entries | map("\(.key)=\(.value|tostring)") | .[]' ${{ github.action_path }}/manifest.json >> "$GITHUB_OUTPUT"
+
+    - name: Debug Github Output
+      shell: bash
+      run: |
+        echo "composer=${{ steps.extract-software-requirements.outputs.composer }}"
+        echo "php=${{ steps.extract-software-requirements.outputs.php }}"
+        echo "mysql=${{ steps.extract-software-requirements.outputs.mysql }}"
+        echo "mariadb=${{ steps.extract-software-requirements.outputs.mariadb }}"
+        echo "elasticsearch=${{ steps.extract-software-requirements.outputs.elasticsearch }}"
+        echo "opensearch=${{ steps.extract-software-requirements.outputs.opensearch }}"
+        echo "redis=${{ steps.extract-software-requirements.outputs.redis }}"
+        echo "valkey=${{ steps.extract-software-requirements.outputs.valkey }}"
+        echo "apache=${{ steps.extract-software-requirements.outputs.apache }}"
+        echo "nginx=${{ steps.extract-software-requirements.outputs.nginx }}"
+        echo "varnish=${{ steps.extract-software-requirements.outputs.varnish }}"
+        echo "rabbitmq=${{ steps.extract-software-requirements.outputs.rabbitmq }}"
+        echo "activemq_artemis=${{ steps.extract-software-requirements.outputs.activemq_artemis }}"

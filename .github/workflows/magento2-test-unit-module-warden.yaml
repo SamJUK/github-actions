@@ -1,0 +1,109 @@
+name: Unit Tests
+
+on:
+  workflow_call:
+    inputs:
+      test_directory:
+        description: 'Directory containing tests to run'
+        required: false
+        type: string
+        default: './extensions/${{ github.event.repository.name }}/Test/Unit'
+      magento_version:
+        description: 'Magento Version to test against'
+        required: false
+        type: string
+        default: '2.4.8'
+      magento_repository:
+        description: 'Magento Repository to use'
+        required: false
+        type: string
+        default: 'https://mirror.mage-os.org/'
+
+jobs:
+  compute-software-requirements:
+    runs-on: ubuntu-latest
+    outputs:
+      composer: ${{ steps.compute-software-requirements.outputs.composer }}
+      php: ${{ steps.compute-software-requirements.outputs.php }}
+      mysql: ${{ steps.compute-software-requirements.outputs.mysql }}
+      mariadb: ${{ steps.compute-software-requirements.outputs.mariadb }}
+      elasticsearch: ${{ steps.compute-software-requirements.outputs.elasticsearch }}
+      opensearch: ${{ steps.compute-software-requirements.outputs.opensearch }}
+      redis: ${{ steps.compute-software-requirements.outputs.redis }}
+      valkey: ${{ steps.compute-software-requirements.outputs.valkey }}
+      apache: ${{ steps.compute-software-requirements.outputs.apache }}
+      nginx: ${{ steps.compute-software-requirements.outputs.nginx }}
+      varnish: ${{ steps.compute-software-requirements.outputs.varnish }}
+      rabbitmq: ${{ steps.compute-software-requirements.outputs.rabbitmq }}
+      activemq_artemis: ${{ steps.compute-software-requirements.outputs.activemq_artemis }}
+
+    steps:
+      - name: Checkout Local Actions
+        uses: actions/checkout@v4
+
+      - name: Compute Software Requirements
+        id: compute-software-requirements
+        uses: samjuk/github-actions/.github/actions/magento/compute-software-requirements@master
+        with:
+          magento_version: ${{ inputs.magento_version }}
+
+  unit-test:
+    runs-on: ubuntu-latest
+    needs: compute-software-requirements
+    
+    steps:
+      - name: Checkout Local Actions
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: ./extensions/${{ github.event.repository.name }}
+
+      - name: Create Warden Environment
+        uses: samjuk/github-actions/.github/actions/warden/create-env@master
+        with:
+          env_name: "unit-test-env"
+          env_type: "magento2"
+          db_distribution: "mariadb"
+          db_version: "${{ needs.compute-software-requirements.outputs.mariadb }}"
+          composer_version: "${{ needs.compute-software-requirements.outputs.composer }}"
+          php_version: "${{ needs.compute-software-requirements.outputs.php }}"
+          php_xdebug3: "1"
+          opensearch_enabled: "1"
+          opensearch_version: "${{ needs.compute-software-requirements.outputs.opensearch }}"
+          elasticsearch_enabled: "0"
+          elasticsearch_version: "${{ needs.compute-software-requirements.outputs.elasticsearch }}"
+
+      - name: Setup Warden Environment
+        uses: samjuk/github-actions/.github/actions/warden/setup-environment@master
+
+      - name: Environment Information
+        run: |
+          export WARDEN="$(pwd)/warden/bin/warden"
+          ${WARDEN} shell -c "php -v"
+          ${WARDEN} shell -c "composer --version"
+
+      # - name: Composer Security Advisories ignore minor Magento CVEs
+      #   run: |
+      #     export WARDEN="$(pwd)/warden/bin/warden"
+      #     ${WARDEN} shell -c 'sudo composer config --global "audit.ignore" PKSA-jvpv-pcrn-dfzc PKSA-jqsz-ykjr-qncb '
+
+      - name: Create Magento Project
+        run: |
+          export WARDEN="$(pwd)/warden/bin/warden"
+          ${WARDEN} shell -c "sudo composer self-update --stable" # Temporary fix until 2.9.2 is the packaged version
+          ${WARDEN} shell -c "COMPOSER_NO_SECURITY_BLOCKING=1 composer create-project --no-interaction --repository-url=${{ inputs.magento_repository }} magento/project-community-edition=${{ inputs.magento_version }} /tmp/magento"
+          ${WARDEN} shell -c "rsync -avz /tmp/magento/ /var/www/html/"
+
+      - name: Setup Local Extension within Composer
+        run: |
+          export WARDEN="$(pwd)/warden/bin/warden"
+          EXT_NAME=$(cat ./extensions/${{ github.event.repository.name }}/composer.json | jq -r '.name')
+          ${WARDEN} shell -c "composer config repositories.local path ./extensions"
+          ${WARDEN} shell -c "COMPOSER_NO_SECURITY_BLOCKING=1 composer require -W --prefer-source '${EXT_NAME}:@dev'"
+
+      - name: Run Unit Tests
+        run: |
+          export WARDEN="$(pwd)/warden/bin/warden"
+          ${WARDEN} shell -c "vendor/bin/phpunit ${{ inputs.test_directory }}"
+
+  

@@ -1,0 +1,94 @@
+name: Unit Tests - Project (GHAS)
+
+on:
+  workflow_call:
+    inputs:
+      test_directory:
+        description: 'Directory containing tests to run'
+        required: false
+        type: string
+        default: './'
+      magento_version:
+        description: 'Magento Version to stand up infrastructure against'
+        required: false
+        type: string
+        default: '2.4.8'
+
+jobs:
+  compute-software-requirements:
+    runs-on: ubuntu-latest
+    outputs:
+      composer: ${{ steps.compute-software-requirements.outputs.composer }}
+      php: ${{ steps.compute-software-requirements.outputs.php }}
+      mysql: ${{ steps.compute-software-requirements.outputs.mysql }}
+      mariadb: ${{ steps.compute-software-requirements.outputs.mariadb }}
+      elasticsearch: ${{ steps.compute-software-requirements.outputs.elasticsearch }}
+      opensearch: ${{ steps.compute-software-requirements.outputs.opensearch }}
+      redis: ${{ steps.compute-software-requirements.outputs.redis }}
+      valkey: ${{ steps.compute-software-requirements.outputs.valkey }}
+      apache: ${{ steps.compute-software-requirements.outputs.apache }}
+      nginx: ${{ steps.compute-software-requirements.outputs.nginx }}
+      varnish: ${{ steps.compute-software-requirements.outputs.varnish }}
+      rabbitmq: ${{ steps.compute-software-requirements.outputs.rabbitmq }}
+      activemq_artemis: ${{ steps.compute-software-requirements.outputs.activemq_artemis }}
+    steps:
+      - name: Checkout Local Actions
+        uses: actions/checkout@v4
+      - name: Compute Software Requirements
+        id: compute-software-requirements
+        uses: samjuk/github-actions/.github/actions/magento/compute-software-requirements@master
+        with:
+          magento_version: ${{ inputs.magento_version }}
+
+  unit-test:
+    runs-on: ubuntu-latest
+    needs : compute-software-requirements
+    container:
+      image: samjuk/magento-base-ci-testing-env:${{ needs.compute-software-requirements.outputs.php }}
+      # https://github.com/actions/runner/issues/878#issuecomment-1290921350
+      options:
+        --user 1001:1001
+        -v "${{github.workspace}}":"${{github.workspace}}"
+    services:
+      mysql:
+        image: mysql:${{ needs.compute-software-requirements.outputs.mysql }}
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: magento
+        ports:
+          - 3306:3306
+        options: --tmpfs /tmp:rw --tmpfs /var/lib/mysql:rw --health-cmd="mysqladmin ping --silent" --health-interval=10s --health-timeout=5s --health-retries=3
+      redis:
+        image: redis:${{ needs.compute-software-requirements.outputs.redis }}
+        ports:
+          - 6379:6379
+        options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=3
+      elasticsearch:
+        image: docker.io/wardenenv/opensearch:${{ needs.compute-software-requirements.outputs.opensearch }}
+        ports:
+          - 9200:9200
+        env:
+          'discovery.type': single-node
+          'xpack.security.enabled': false
+          'ES_JAVA_OPTS': "-Xms64m -Xmx512m"
+          'OPENSEARCH_INITIAL_ADMIN_PASSWORD': 'M9ZKGW2xAD5Qp9cewSAVQ0uP'
+        options: --health-cmd="curl localhost:9200/_cluster/health?wait_for_status=yellow&timeout=60s" --health-start-period=7s --health-interval=10s --health-timeout=5s --health-retries=3
+    steps:
+      - name: Environment Information
+        run: |
+          php -v
+          composer --version
+
+          
+      - name: Checkout Project
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+            
+      - name: Install Project and dependencies
+        run: |
+          COMPOSER_NO_SECURITY_BLOCKING=1 composer install
+
+      - name: Run Unit Tests
+        run: |
+          vendor/bin/phpunit ${{ inputs.test_directory }}

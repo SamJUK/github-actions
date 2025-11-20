@@ -1,0 +1,134 @@
+name: "Create a Warden .env file"
+author: "SamJUK"
+description: "A Github Action that creates a Warden .env file"
+
+inputs:
+  env_name: 
+    description: "The name of the Warden environment"
+    required: false
+    default: "magento2"
+  env_type:
+    description: "The type of Warden environment"
+    required: false
+    default: "magento2"
+  magepack_enabled:
+    description: "Whether to enable Magepack in the Warden environment"
+    required: false
+    default: "0"
+  magepack_version:
+    description: "The version of Magepack to use if enabled"
+    required: false
+    default: "2.11"
+  varnish_enabled:
+    description: "Whether to enable Varnish in the Warden environment"
+    required: false
+    default: "0"
+  varnish_version:
+    description: "The version of Varnish to use"
+    required: false
+    default: "7.1"
+  redis_enabled:
+    description: "Whether to enable Redis in the Warden environment"
+    required: false
+    default: "1"
+  redis_version:
+    description: "The version of Redis to use"
+    required: false
+    default: "7.0"
+  rabbitmq_enabled:
+    description: "Whether to enable RabbitMQ in the Warden environment"
+    required: false
+    default: "0"
+  rabbitmq_version:
+    description: "The version of RabbitMQ to use"
+    required: false
+    default: "3.9"
+  node_version:
+    description: "The version of Node.js to use"
+    required: false
+    default: "12"
+  db_distribution:
+    description: "The database distribution to use (e.g., mariadb, mysql)"
+    required: false
+    default: "mariadb"
+  db_version:
+    description: "The version of the database to use"
+    required: false
+    default: "10.6"
+  composer_version:
+    description: "The version of Composer to use"
+    required: false
+    default: "2.2"
+  php_version: 
+    description: "The version of PHP to use"
+    required: false
+    default: "8.1"
+  php_xdebug3:
+    description: "Whether to enable Xdebug 3 in the Warden environment"
+    required: false
+    default: "1"
+  opensearch_enabled:
+    description: "Whether to enable OpenSearch in the Warden environment"
+    required: false
+    default: "1"
+  opensearch_version:
+    description: "The version of OpenSearch to use"
+    required: false
+    default: "2.5"
+  elasticsearch_enabled:
+    description: "Whether to enable Elasticsearch in the Warden environment"
+    required: false
+    default: "0"
+  elasticsearch_version:
+    description: "The version of Elasticsearch to use"
+    required: false
+    default: "7.10"
+  elasticsearch_hq_enabled:
+    description: "Whether to enable ElasticHQ in the Warden environment"
+    required: false
+    default: "0"
+
+runs:
+  using: composite
+  steps:
+    - name: Write Warden .env File
+      shell: bash
+      run: |
+        cat <<EOF > .env
+        WARDEN_ENV_NAME=${{ inputs.env_name }}
+        WARDEN_ENV_TYPE=${{ inputs.env_type }}
+        WARDEN_WEB_ROOT=/
+        
+        TRAEFIK_DOMAIN=${{ inputs.env_name }}.test
+        TRAEFIK_SUBDOMAIN=app
+        
+        WARDEN_ELASTICHQ=${{ inputs.elasticsearch_hq_enabled }}
+
+        WARDEN_ELASTICSEARCH=${{ inputs.elasticsearch_enabled }}
+        ELASTICSEARCH_VERSION=${{ inputs.elasticsearch_version }}
+        
+        WARDEN_OPENSEARCH=${{ inputs.opensearch_enabled }}
+        OPENSEARCH_VERSION=${{ inputs.opensearch_version }}
+
+        WARDEN_DB=1
+        MYSQL_DISTRIBUTION=${{ inputs.db_distribution }}
+        MYSQL_DISTRIBUTION_VERSION=${{ inputs.db_version }}
+        
+        NODE_VERSION=${{ inputs.node_version }}
+        
+        COMPOSER_VERSION=${{ inputs.composer_version }}
+        PHP_VERSION=${{ inputs.php_version }}
+        PHP_XDEBUG_3=${{ inputs.php_xdebug3 }}
+        
+        WARDEN_RABBITMQ=${{ inputs.rabbitmq_enabled }}
+        RABBITMQ_VERSION=${{ inputs.rabbitmq_version }}
+
+        WARDEN_REDIS=${{ inputs.redis_enabled }}
+        REDIS_VERSION=${{ inputs.redis_version }}
+        
+        WARDEN_VARNISH=${{ inputs.varnish_enabled }}
+        VARNISH_VERSION=${{ inputs.varnish_version }}
+
+        WARDEN_MAGEPACK=${{ inputs.magepack_enabled }}
+        MAGEPACK_VERSION=${{ inputs.magepack_version }}
+        EOF
