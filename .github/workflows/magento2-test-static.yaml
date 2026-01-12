@@ -45,9 +45,26 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Create shared PHPCS ruleset
+        run: |
+          cat <<'EOF' > phpcs.xml
+          <?xml version="1.0"?>
+          <ruleset name="Magento2 Shared Rules">
+      
+              <!-- Base Magento2 standard -->
+              <rule ref="Magento2"/>
+      
+              <!-- Disable brace-on-same-line warning -->
+              <rule ref="Squiz.Functions.MultiLineFunctionDeclaration">
+                  <exclude name="Squiz.Functions.MultiLineFunctionDeclaration.BraceOnSameLine"/>
+              </rule>
+      
+          </ruleset>
+          EOF
+
       - name: Run PHPCS
         run: |
-          phpcs --standard=Magento2 --extensions=php,phtml -p ${{ inputs.directory }} --severity=${{ inputs.phpcs_severity }}
+          phpcs --standard=phpcs.xml --extensions=php,phtml -p ${{ inputs.directory }} --severity=${{ inputs.phpcs_severity }}
 
   phpstan:
     runs-on: ubuntu-latest
