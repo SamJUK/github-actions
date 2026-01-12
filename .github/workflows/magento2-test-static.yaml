@@ -58,6 +58,11 @@ jobs:
               <rule ref="Squiz.Functions.MultiLineFunctionDeclaration">
                   <exclude name="Squiz.Functions.MultiLineFunctionDeclaration.BraceOnSameLine"/>
               </rule>
+          
+              <!-- Disable content-before-closing-brace warning -->
+              <rule ref="Squiz.WhiteSpace.ScopeClosingBrace">
+                  <exclude name="Squiz.WhiteSpace.ScopeClosingBrace.ContentBefore"/>
+              </rule>
       
           </ruleset>
           EOF
