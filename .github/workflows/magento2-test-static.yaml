@@ -18,6 +18,11 @@ on:
         type: string
         default: "6"
         description: "PHPCS severity level"
+      phpcs_write_config:
+        required: false
+        type: boolean
+        default: true
+        description: "Whether to write a shared PHPCS config file"
       phpstan_level:
         required: false
         type: string
@@ -46,6 +51,7 @@ jobs:
           fetch-depth: 0
 
       - name: Create shared PHPCS ruleset
+        if: ${{ inputs.phpcs_write_config }}
         run: |
           cat <<'EOF' > phpcs.xml
           <?xml version="1.0"?>
@@ -62,6 +68,29 @@ jobs:
               <!-- Disable content-before-closing-brace warning -->
               <rule ref="Squiz.WhiteSpace.ScopeClosingBrace">
                   <exclude name="Squiz.WhiteSpace.ScopeClosingBrace.ContentBefore"/>
+              </rule>
+
+              <!-- Magento docblocks are often noisy / incorrect -->
+              <rule ref="Magento2.Commenting.ClassPropertyPHPDocFormatting">
+                  <severity>0</severity>
+              </rule>
+          
+              <!-- Descriptive Naming & Type Hints negates comment block requirement -->
+              <rule ref="Magento2.Annotation.MethodAnnotationStructure.NoCommentBlock">
+                  <severity>0</severity>
+              </rule>
+          
+              <!-- Allow longer lines (XML, DI, UI components) -->
+              <rule ref="Generic.Files.LineLength">
+                  <properties>
+                      <property name="lineLimit" value="140"/>
+                      <property name="absoluteLineLimit" value="180"/>
+                  </properties>
+              </rule>
+          
+              <!-- Disable overly pedantic spacing rules -->
+              <rule ref="Squiz.WhiteSpace.ControlStructureSpacing">
+                  <severity>0</severity>
               </rule>
       
           </ruleset>
