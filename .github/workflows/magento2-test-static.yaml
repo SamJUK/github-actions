@@ -147,16 +147,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Composer Install
-        run: |
-          composer install --no-interaction --prefer-dist --optimize-autoloader
-
       - name: Write default phpstan.neon if missing
         run: |
-          echo "" > phpstan.neon
-          # if [ ! -f phpstan.neon ]; then
-          #   touch phpstan.neon
-          # fi
+          if [ ! -f phpstan.neon ]; then
+             echo "" > phpstan.neon;
+          fi
 
       - name: Run PHPStan
         run: |
