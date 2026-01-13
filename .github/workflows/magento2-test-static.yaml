@@ -47,7 +47,13 @@ jobs:
       - name: Setup Magento Mirror
         if: ${{ inputs.magento_mirror != '' }}
         run: |
-          composer config --global repositories.magentomirror composer "${{ inputs.magento_mirror }}"
+          composer config --global repositories.magentomirror composer "${{ inputs.magento_mirror }}" && \
+          composer config --no-plugins allow-plugins.phpstan/extension-installer true && \
+          composer config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true && \
+          composer config --no-plugins allow-plugins.magento/* true && \
+          composer config --no-plugins allow-plugins.laminas/laminas-dependency-plugin true && \
+          composer config --no-plugins allow-plugins.php-http/discovery true && \
+          composer config --no-plugins allow-plugins.phpro/grumphp true
 
       - name: Setup PHPCS Magento2 Standard
         run: |
@@ -122,7 +128,13 @@ jobs:
       - name: Setup Magento Mirror
         if: ${{ inputs.magento_mirror != '' }}
         run: |
-          composer config --global repositories.magentomirror composer "${{ inputs.magento_mirror }}"
+          composer config --global repositories.magentomirror composer "${{ inputs.magento_mirror }}" && \
+          composer config --no-plugins allow-plugins.phpstan/extension-installer true && \
+          composer config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true && \
+          composer config --no-plugins allow-plugins.magento/* true && \
+          composer config --no-plugins allow-plugins.laminas/laminas-dependency-plugin true && \
+          composer config --no-plugins allow-plugins.php-http/discovery true && \
+          composer config --no-plugins allow-plugins.phpro/grumphp true
 
       - name: Install PHPStan Magento Extension
         run: |
