@@ -3,6 +3,11 @@ name: Magento2 Static Analysis
 on:
   workflow_call:
     inputs:
+      magento_mirror:
+        required: false
+        type: string
+        default: "https://mirror.sdj.pw/magento/"
+        description: "Magento Mirror URL (empty string to Disable)"
       php_version:
         required: false
         type: string
@@ -38,6 +43,11 @@ jobs:
         with:
           php-version: ${{ inputs.php_version }}
           tools: phpcs
+
+      - name: Setup Magento Mirror
+        if: ${{ inputs.magento_mirror != '' }}
+        run: |
+          composer config --global repositories.magentomirror composer "${{ inputs.magento_mirror }}"
 
       - name: Setup PHPCS Magento2 Standard
         run: |
@@ -108,6 +118,11 @@ jobs:
         with:
           php-version: ${{ inputs.php_version }}
           tools: phpstan
+
+      - name: Setup Magento Mirror
+        if: ${{ inputs.magento_mirror != '' }}
+        run: |
+          composer config --global repositories.magentomirror composer "${{ inputs.magento_mirror }}"
 
       - name: Install PHPStan Magento Extension
         run: |
