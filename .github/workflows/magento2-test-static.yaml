@@ -6,7 +6,7 @@ on:
       magento_mirror:
         required: false
         type: string
-        default: "https://mirror.sdj.pw/magento/"
+        default: "https://mage-os.hypernode.com/mirror/"
         description: "Magento Mirror URL (empty string to Disable)"
       php_version:
         required: false
