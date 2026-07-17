@@ -54,3 +54,24 @@ jobs:
       module_path: ./extensions/${{ github.event.repository.name }}/.github/fixtures/demo-package
       magento_version: '2.4.6-p15'
       run_unit_tests: true
+
+  # magento_distribution: mage-os - proves the container image swaps to
+  # mage-os-ci-testing-env and the software-requirements lookup resolves under the
+  # "mage-os" manifest key instead of "magento".
+  test-mageos-compat:
+    uses: ./.github/workflows/magento2-test-phpunit-module-ghas.yaml
+    with:
+      module_path: ./extensions/${{ github.event.repository.name }}/.github/fixtures/demo-package-unit-only
+      magento_distribution: 'mage-os'
+      magento_version: '3.2.0'
+      run_unit_tests: true
+
+  # php_version override - 2.4.8 computes to php8.4, but samjuk/magento-ci-testing-env
+  # also publishes a 2.4.8-php8.3 image, so this proves the override actually takes the
+  # container off the computed PHP version rather than being silently ignored.
+  test-php-version-override:
+    uses: ./.github/workflows/magento2-test-phpunit-module-ghas.yaml
+    with:
+      module_path: ./extensions/${{ github.event.repository.name }}/.github/fixtures/demo-package-unit-only
+      php_version: '8.3'
+      run_unit_tests: true

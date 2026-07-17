@@ -15,7 +15,7 @@ on:
         default: ''
     outputs:
       versions:
-        description: 'JSON array of supported Magento versions, for use in a matrix (fromJson(...))'
+        description: 'JSON array of {distribution, version} objects, for use in a matrix (fromJson(...))'
         value: ${{ jobs.compute.outputs.versions }}
 
 jobs:
@@ -32,45 +32,67 @@ jobs:
           INCLUDE_INPUT: ${{ inputs.include }}
           EXCLUDE_INPUT: ${{ inputs.exclude }}
         run: |
-          # Single place to bump the org-wide Magento support matrix on new releases.
+          # Single place to bump the org-wide Magento/Mage-OS support matrix on new releases.
+          # Entries are "distribution:version" - Mage-OS versions don't correlate with
+          # Magento's numbering (e.g. 3.2.0 vs 2.4.9), so distribution disambiguates.
           # 2.4.4 dropped: defaults to search-engine: elasticsearch7/elasticsearch-host,
           # which the phpunit-* workflows' integration-test config doesn't account for.
-          BASE_VERSIONS=(
-            2.4.9
-            2.4.8-p5
-            2.4.7-p10
-            2.4.6-p15
+          BASE_ENTRIES=(
+            magento:2.4.9
+            magento:2.4.8-p5
+            magento:2.4.7-p10
+            magento:2.4.6-p15
+            mage-os:3.2.0
           )
 
-          mapfile -t INCLUDE_VERSIONS <<< "$INCLUDE_INPUT"
+          # include/exclude lines may be "distribution:version" or a bare version (implies
+          # magento, for brevity). exclude also accepts a bare glob (e.g. "2.4.9*") matched
+          # against the version part only, regardless of distribution.
+          mapfile -t INCLUDE_INPUT_LINES <<< "$INCLUDE_INPUT"
           mapfile -t EXCLUDE_PATTERNS <<< "$EXCLUDE_INPUT"
 
+          INCLUDE_ENTRIES=()
+          for line in "${INCLUDE_INPUT_LINES[@]}"; do
+            [[ -z "$line" ]] && continue
+            if [[ "$line" == *:* ]]; then
+              INCLUDE_ENTRIES+=("$line")
+            else
+              INCLUDE_ENTRIES+=("magento:$line")
+            fi
+          done
+
           declare -A seen
-          VERSIONS=()
-          for v in "${BASE_VERSIONS[@]}" "${INCLUDE_VERSIONS[@]}"; do
-            [[ -z "$v" ]] && continue
-            if [[ -z "${seen[$v]:-}" ]]; then
-              seen[$v]=1
-              VERSIONS+=("$v")
+          ENTRIES=()
+          for e in "${BASE_ENTRIES[@]}" "${INCLUDE_ENTRIES[@]}"; do
+            [[ -z "$e" ]] && continue
+            if [[ -z "${seen[$e]:-}" ]]; then
+              seen[$e]=1
+              ENTRIES+=("$e")
             fi
           done
 
           RESULT=()
-          for v in "${VERSIONS[@]}"; do
+          for e in "${ENTRIES[@]}"; do
+            version="${e#*:}"
             excluded=0
             for pattern in "${EXCLUDE_PATTERNS[@]}"; do
               [[ -z "$pattern" ]] && continue
+              if [[ "$pattern" == *:* ]]; then
+                match_against="$e"
+              else
+                match_against="$version"
+              fi
               # shellcheck disable=SC2053 # unquoted on purpose: enables glob patterns like "2.4.9*"
-              if [[ "$v" == $pattern ]]; then
+              if [[ "$match_against" == $pattern ]]; then
                 excluded=1
                 break
               fi
             done
             if [[ "$excluded" -eq 0 ]]; then
-              RESULT+=("$v")
+              RESULT+=("$e")
             fi
           done
 
-          JSON=$(printf '%s\n' "${RESULT[@]}" | jq -R . | jq -sc .)
+          JSON=$(printf '%s\n' "${RESULT[@]}" | jq -R 'split(":") | {distribution: .[0], version: .[1]}' | jq -sc .)
           echo "Supported versions: $JSON"
           echo "versions=$JSON" >> "$GITHUB_OUTPUT"
