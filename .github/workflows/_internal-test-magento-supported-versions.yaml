@@ -1,0 +1,56 @@
+name: Test magento-supported-versions
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/magento-supported-versions.yaml
+      - .github/workflows/_internal-test-magento-supported-versions.yaml
+  pull_request:
+    paths:
+      - .github/workflows/magento-supported-versions.yaml
+      - .github/workflows/_internal-test-magento-supported-versions.yaml
+
+jobs:
+  default:
+    uses: ./.github/workflows/magento-supported-versions.yaml
+
+  include-exclude:
+    uses: ./.github/workflows/magento-supported-versions.yaml
+    with:
+      include: |
+        2.4.3-p17
+        2.4.9-p1
+      exclude: |
+        2.4.8-p5
+        2.4.9*
+
+  assert:
+    name: Assert
+    needs: [default, include-exclude]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assert default list
+        shell: bash
+        run: |
+          actual='${{ needs.default.outputs.versions }}'
+          expected='["2.4.9","2.4.8-p5","2.4.7-p10","2.4.6-p15"]'
+          if [[ "$actual" != "$expected" ]]; then
+            echo "expected: $expected"
+            echo "actual:   $actual"
+            exit 1
+          fi
+
+      - name: Assert include/exclude + glob applied
+        shell: bash
+        run: |
+          actual='${{ needs.include-exclude.outputs.versions }}'
+          # 2.4.8-p5 dropped by exact exclude; base "2.4.9" and the just-included
+          # "2.4.9-p1" both dropped by the "2.4.9*" glob exclude - proves glob
+          # matching works against base AND included entries, not just exact strings.
+          expected='["2.4.7-p10","2.4.6-p15","2.4.3-p17"]'
+          if [[ "$actual" != "$expected" ]]; then
+            echo "expected: $expected"
+            echo "actual:   $actual"
+            exit 1
+          fi

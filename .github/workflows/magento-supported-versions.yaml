@@ -1,0 +1,76 @@
+name: Magento Supported Versions
+
+on:
+  workflow_call:
+    inputs:
+      include:
+        description: 'Extra Magento versions to add to the supported list, one per line'
+        required: false
+        type: string
+        default: ''
+      exclude:
+        description: 'Magento versions (or glob patterns, e.g. "2.4.9*") to remove from the supported list, one per line'
+        required: false
+        type: string
+        default: ''
+    outputs:
+      versions:
+        description: 'JSON array of supported Magento versions, for use in a matrix (fromJson(...))'
+        value: ${{ jobs.compute.outputs.versions }}
+
+jobs:
+  compute:
+    name: Compute Supported Versions
+    runs-on: ubuntu-latest
+    outputs:
+      versions: ${{ steps.compute.outputs.versions }}
+    steps:
+      - name: Compute Supported Versions
+        id: compute
+        shell: bash
+        env:
+          INCLUDE_INPUT: ${{ inputs.include }}
+          EXCLUDE_INPUT: ${{ inputs.exclude }}
+        run: |
+          # Single place to bump the org-wide Magento support matrix on new releases.
+          # 2.4.4 dropped: defaults to search-engine: elasticsearch7/elasticsearch-host,
+          # which the phpunit-* workflows' integration-test config doesn't account for.
+          BASE_VERSIONS=(
+            2.4.9
+            2.4.8-p5
+            2.4.7-p10
+            2.4.6-p15
+          )
+
+          mapfile -t INCLUDE_VERSIONS <<< "$INCLUDE_INPUT"
+          mapfile -t EXCLUDE_PATTERNS <<< "$EXCLUDE_INPUT"
+
+          declare -A seen
+          VERSIONS=()
+          for v in "${BASE_VERSIONS[@]}" "${INCLUDE_VERSIONS[@]}"; do
+            [[ -z "$v" ]] && continue
+            if [[ -z "${seen[$v]:-}" ]]; then
+              seen[$v]=1
+              VERSIONS+=("$v")
+            fi
+          done
+
+          RESULT=()
+          for v in "${VERSIONS[@]}"; do
+            excluded=0
+            for pattern in "${EXCLUDE_PATTERNS[@]}"; do
+              [[ -z "$pattern" ]] && continue
+              # shellcheck disable=SC2053 # unquoted on purpose: enables glob patterns like "2.4.9*"
+              if [[ "$v" == $pattern ]]; then
+                excluded=1
+                break
+              fi
+            done
+            if [[ "$excluded" -eq 0 ]]; then
+              RESULT+=("$v")
+            fi
+          done
+
+          JSON=$(printf '%s\n' "${RESULT[@]}" | jq -R . | jq -sc .)
+          echo "Supported versions: $JSON"
+          echo "versions=$JSON" >> "$GITHUB_OUTPUT"
