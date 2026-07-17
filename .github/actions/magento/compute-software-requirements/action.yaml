@@ -3,9 +3,13 @@ author: "SamJUK"
 description: "A Github Action computes Magento Software Requirements"
 
 inputs:
-  magento_version: 
+  magento_version:
     description: "Magento Verison"
     required: true
+  distribution:
+    description: "Product distribution ('magento' or 'mage-os')"
+    required: false
+    default: "magento"
 
 outputs:
   composer:
@@ -55,7 +59,7 @@ runs:
       id: extract-software-requirements
       shell: bash
       run: |
-        jq -r --arg v ${{ inputs.magento_version }} '.[$v] | to_entries | map("\(.key)=\(.value|tostring)") | .[]' ${{ github.action_path }}/manifest.json >> "$GITHUB_OUTPUT"
+        jq -r --arg d ${{ inputs.distribution }} --arg v ${{ inputs.magento_version }} '.[$d][$v] | to_entries | map("\(.key)=\(.value|tostring)") | .[]' ${{ github.action_path }}/manifest.json >> "$GITHUB_OUTPUT"
 
     - name: Debug Github Output
       shell: bash

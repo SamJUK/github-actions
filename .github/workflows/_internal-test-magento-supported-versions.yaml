@@ -25,16 +25,24 @@ jobs:
         2.4.8-p5
         2.4.9*
 
+  distribution-scoped:
+    uses: ./.github/workflows/magento-supported-versions.yaml
+    with:
+      include: |
+        mage-os:2.3.0
+      exclude: |
+        mage-os:3.2.0
+
   assert:
     name: Assert
-    needs: [default, include-exclude]
+    needs: [default, include-exclude, distribution-scoped]
     runs-on: ubuntu-latest
     steps:
       - name: Assert default list
         shell: bash
         run: |
           actual='${{ needs.default.outputs.versions }}'
-          expected='["2.4.9","2.4.8-p5","2.4.7-p10","2.4.6-p15"]'
+          expected='[{"distribution":"magento","version":"2.4.9"},{"distribution":"magento","version":"2.4.8-p5"},{"distribution":"magento","version":"2.4.7-p10"},{"distribution":"magento","version":"2.4.6-p15"},{"distribution":"mage-os","version":"3.2.0"}]'
           if [[ "$actual" != "$expected" ]]; then
             echo "expected: $expected"
             echo "actual:   $actual"
@@ -45,10 +53,25 @@ jobs:
         shell: bash
         run: |
           actual='${{ needs.include-exclude.outputs.versions }}'
-          # 2.4.8-p5 dropped by exact exclude; base "2.4.9" and the just-included
-          # "2.4.9-p1" both dropped by the "2.4.9*" glob exclude - proves glob
-          # matching works against base AND included entries, not just exact strings.
-          expected='["2.4.7-p10","2.4.6-p15","2.4.3-p17"]'
+          # magento:2.4.8-p5 dropped by exact (bare, version-only) exclude; base "2.4.9"
+          # and the just-included "2.4.9-p1" both dropped by the "2.4.9*" glob exclude -
+          # proves glob matching works against base AND included entries, not just exact
+          # strings, and that a bare (no distribution) exclude only matches the version part.
+          # mage-os:3.2.0 survives untouched - "2.4.9*" doesn't match "3.2.0".
+          expected='[{"distribution":"magento","version":"2.4.7-p10"},{"distribution":"magento","version":"2.4.6-p15"},{"distribution":"mage-os","version":"3.2.0"},{"distribution":"magento","version":"2.4.3-p17"}]'
+          if [[ "$actual" != "$expected" ]]; then
+            echo "expected: $expected"
+            echo "actual:   $actual"
+            exit 1
+          fi
+
+      - name: Assert distribution-qualified include/exclude
+        shell: bash
+        run: |
+          actual='${{ needs.distribution-scoped.outputs.versions }}'
+          # "mage-os:3.2.0" exact-excluded (distribution-qualified, doesn't touch any
+          # magento entry); "mage-os:2.3.0" included the same way.
+          expected='[{"distribution":"magento","version":"2.4.9"},{"distribution":"magento","version":"2.4.8-p5"},{"distribution":"magento","version":"2.4.7-p10"},{"distribution":"magento","version":"2.4.6-p15"},{"distribution":"mage-os","version":"2.3.0"}]'
           if [[ "$actual" != "$expected" ]]; then
             echo "expected: $expected"
             echo "actual:   $actual"

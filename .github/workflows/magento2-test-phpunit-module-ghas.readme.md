@@ -8,6 +8,10 @@ This workflow runs PHPUnit-based tests against a Magento module, using Github Ac
 
 2.4.4 and earlier aren't supported for `run_integration_tests` - those versions default to `search-engine: elasticsearch7`/`elasticsearch-host` instead of `opensearch-host`, which this workflow doesn't account for, so search installation fails. Already excluded from [magento-supported-versions](./magento-supported-versions.readme.md)'s base list for this reason - don't `include:` it back in for a consumer that enables `run_integration_tests`.
 
+`magento_distribution` (default `magento`) switches to `mage-os` to test against Mage-OS instead - swaps the container image (`mage-os-ci-testing-env` instead of `magento-ci-testing-env`) and the software-requirements lookup accordingly. Mage-OS version numbers don't correlate with Magento's (e.g. `3.2.0`, not `2.4.x`).
+
+`php_version` overrides the PHP version used for the container image - defaults to whatever's computed for `magento_version`/`magento_distribution`. Useful for a release that officially supports multiple PHP versions and you want to pin/test a specific one.
+
 ## Usage
 
 Get the version matrix from [magento-supported-versions](./magento-supported-versions.readme.md) rather than hardcoding one, so every consumer picks up support changes automatically:
@@ -30,11 +34,12 @@ jobs:
     uses: samjuk/github-actions/.github/workflows/magento2-test-phpunit-module-ghas.yaml@master
     needs: [static, supported-versions]
     with:
-      magento_version: ${{ matrix.magento_version }}
+      magento_version: ${{ matrix.version }}
+      magento_distribution: ${{ matrix.distribution }}
       run_unit_tests: true
       run_integration_tests: true
     strategy:
       fail-fast: false
       matrix:
-        magento_version: ${{ fromJson(needs.supported-versions.outputs.versions) }}
+        include: ${{ fromJson(needs.supported-versions.outputs.versions) }}
 ```
