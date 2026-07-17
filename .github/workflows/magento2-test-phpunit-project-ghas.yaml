@@ -19,10 +19,20 @@ on:
         type: string
         default: 'app/code/*/*/Test/Integration'
       magento_version:
-        description: 'Magento Version to stand up infrastructure against'
+        description: 'Magento/Mage-OS Version to stand up infrastructure against'
         required: false
         type: string
         default: '2.4.8'
+      magento_distribution:
+        description: "Product distribution ('magento' or 'mage-os')"
+        required: false
+        type: string
+        default: 'magento'
+      php_version:
+        description: 'Override the PHP version to test against - defaults to the version computed for magento_version/magento_distribution. Useful when a release supports multiple PHP versions.'
+        required: false
+        type: string
+        default: ''
       run_unit_tests:
         description: 'Run unit tests (test_directory)'
         required: false
@@ -61,13 +71,14 @@ jobs:
         uses: samjuk/github-actions/.github/actions/magento/compute-software-requirements@master
         with:
           magento_version: ${{ inputs.magento_version }}
+          distribution: ${{ inputs.magento_distribution }}
 
   phpunit-test:
     name: PHPUnit Test
     runs-on: ubuntu-latest
     needs: compute-software-requirements
     container:
-      image: samjuk/magento-base-ci-testing-env:${{ needs.compute-software-requirements.outputs.php }}
+      image: samjuk/magento-base-ci-testing-env:${{ inputs.php_version != '' && inputs.php_version || needs.compute-software-requirements.outputs.php }}
       # https://github.com/actions/runner/issues/878#issuecomment-1290921350
       options:
         --user 1001:1001
