@@ -6,8 +6,13 @@ on:
       php_version:
         required: false
         type: string
-        default: "8.3"
+        default: "8.4"
         description: "PHP Version to use"
+      composer_version:
+        required: false
+        type: string
+        default: "2.8"
+        description: "Composer Version to use"
       directory:
         required: false
         type: string
@@ -25,6 +30,12 @@ jobs:
           sparse-checkout: |
             composer.json
             composer.lock
+
+      - name: Set PHP & Composer Version
+        uses: shivammathur/setup-php@8358ee0e2e8afe63c2fb8253d1d52085811ab1e5 # v2
+        with:
+          php-version: ${{ inputs.php_version }}
+          tools: composer:${{ inputs.composer_version }}
 
       - name: Validating Composer
         run: composer validate --no-check-publish

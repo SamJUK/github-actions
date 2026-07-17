@@ -11,7 +11,7 @@ on:
       php_version:
         required: false
         type: string
-        default: "8.3"
+        default: "8.4"
         description: "PHP Version to use"
       directory:
         required: false
