@@ -146,10 +146,21 @@ jobs:
           composer config repositories.local path "${{ inputs.module_path }}"
           composer require -W --prefer-source "${EXT_NAME}:@dev"
 
+      - name: Detect PHPUnit Flags
+        id: phpunit-flags
+        run: |
+          # --display-all-issues was added in PHPUnit 10; older Magento versions (2.4.6/2.4.7)
+          # pin PHPUnit 9.x and reject the flag outright. Detect at runtime rather than mapping
+          # magento_version -> phpunit major, since that mapping is Magento's to change.
+          PHPUNIT_MAJOR=$(vendor/bin/phpunit --version | grep -oE 'PHPUnit [0-9]+' | grep -oE '[0-9]+')
+          FLAGS=""
+          [ "$PHPUNIT_MAJOR" -ge 10 ] && FLAGS="--display-all-issues"
+          echo "flags=${FLAGS}" >> "$GITHUB_OUTPUT"
+
       - name: Run Unit Tests
         if: ${{ inputs.run_unit_tests && steps.test-dirs.outputs.unit_exists == 'true' }}
         run: |
-          vendor/bin/phpunit --display-all-issues "${{ inputs.module_path }}/Test/Unit"
+          vendor/bin/phpunit ${{ steps.phpunit-flags.outputs.flags }} "${{ inputs.module_path }}/Test/Unit"
 
       - name: Run DI Compile
         run: |
@@ -200,4 +211,4 @@ jobs:
         if: ${{ inputs.run_integration_tests && steps.test-dirs.outputs.integration_exists == 'true' }}
         run: |
           cd dev/tests/integration
-          ../../../vendor/bin/phpunit --display-all-issues "../../../${{ inputs.module_path }}/Test/Integration"
+          ../../../vendor/bin/phpunit ${{ steps.phpunit-flags.outputs.flags }} "../../../${{ inputs.module_path }}/Test/Integration"
