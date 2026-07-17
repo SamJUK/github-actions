@@ -1,0 +1,34 @@
+{
+    "name": "samjuk/m2-module-demo-package-no-tests",
+    "description": "Magento 2 demo module (no Test/Unit or Test/Integration at all) used to self-test the bail-early behaviour of magento2-test-phpunit-module-ghas",
+    "type": "magento2-module",
+    "license": "proprietary",
+    "require": {
+        "magento/framework": "^102.0 || ^103.0 || ^104.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5",
+        "phpstan/phpstan": "^1.12",
+        "magento/magento-coding-standard": "*",
+        "phpcompatibility/php-compatibility": "*",
+        "dealerdirect/phpcodesniffer-composer-installer": "*"
+    },
+    "autoload": {
+        "files": ["registration.php"],
+        "psr-4": {
+          "SamJUK\\DemoPackageNoTests\\": ""
+        }
+      },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "magento/composer-dependency-version-audit-plugin": true
+        }
+    },
+    "repositories": {
+        "foomanmirror": {
+            "type": "composer",
+            "url": "https://repo-magento-mirror.fooman.co.nz/"
+        }
+    }
+}

@@ -1,0 +1,47 @@
+name: Test magento2-test-phpunit-module-ghas
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/magento2-test-phpunit-module-ghas.yaml
+      - .github/workflows/_internal-test-magento2-test-phpunit-module-ghas.yaml
+      - .github/actions/magento/compute-software-requirements/**
+      - .github/fixtures/demo-package/**
+      - .github/fixtures/demo-package-unit-only/**
+  pull_request:
+    paths:
+      - .github/workflows/magento2-test-phpunit-module-ghas.yaml
+      - .github/workflows/_internal-test-magento2-test-phpunit-module-ghas.yaml
+      - .github/actions/magento/compute-software-requirements/**
+      - .github/fixtures/demo-package/**
+      - .github/fixtures/demo-package-unit-only/**
+
+# .github/fixtures/demo-package-no-tests (neither Test/Unit nor Test/Integration) exists to
+# prove the bail-early path, but isn't wired into a job here: GitHub Actions doesn't allow
+# continue-on-error on a job that calls a reusable workflow via `uses:`, so there's no way to
+# assert an *expected* failure here without permanently reddening this whole self-test.
+# Verified manually instead by running the Check Test Directories step's exact logic locally
+# against all three fixtures - see commit history for the transcript.
+
+jobs:
+  test-unit-tests:
+    uses: ./.github/workflows/magento2-test-phpunit-module-ghas.yaml
+    with:
+      module_path: ./extensions/${{ github.event.repository.name }}/.github/fixtures/demo-package
+      run_unit_tests: true
+
+  test-integration-tests:
+    uses: ./.github/workflows/magento2-test-phpunit-module-ghas.yaml
+    with:
+      module_path: ./extensions/${{ github.event.repository.name }}/.github/fixtures/demo-package
+      run_integration_tests: true
+
+  # Both flags on, but the module only has Test/Unit - proves integration is skipped
+  # gracefully instead of phpunit hard-failing on a missing directory.
+  test-graceful-skip-missing-integration:
+    uses: ./.github/workflows/magento2-test-phpunit-module-ghas.yaml
+    with:
+      module_path: ./extensions/${{ github.event.repository.name }}/.github/fixtures/demo-package-unit-only
+      run_unit_tests: true
+      run_integration_tests: true
