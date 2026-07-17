@@ -1,0 +1,31 @@
+name: Test magento2-test-phpunit-project-ghas
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/magento2-test-phpunit-project-ghas.yaml
+      - .github/workflows/_internal-test-magento2-test-phpunit-project-ghas.yaml
+      - .github/actions/magento/compute-software-requirements/**
+      - .github/fixtures/demo-project/**
+  pull_request:
+    paths:
+      - .github/workflows/magento2-test-phpunit-project-ghas.yaml
+      - .github/workflows/_internal-test-magento2-test-phpunit-project-ghas.yaml
+      - .github/actions/magento/compute-software-requirements/**
+      - .github/fixtures/demo-project/**
+
+jobs:
+  test-unit-tests:
+    uses: ./.github/workflows/magento2-test-phpunit-project-ghas.yaml
+    with:
+      project_path: ./.github/fixtures/demo-project
+      test_directory: ./Test/Unit
+      run_unit_tests: true
+
+  test-integration-tests:
+    uses: ./.github/workflows/magento2-test-phpunit-project-ghas.yaml
+    with:
+      project_path: ./.github/fixtures/demo-project
+      integration_test_directory: ./testsuite/SamJUK/DemoProject
+      run_integration_tests: true

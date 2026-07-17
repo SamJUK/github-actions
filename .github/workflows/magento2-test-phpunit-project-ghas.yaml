@@ -1,35 +1,35 @@
-name: PHPUnit Tests - Module (GHAS)
+name: PHPUnit Tests - Project (GHAS)
 
 on:
   workflow_call:
     inputs:
-      module_path:
-        description: 'Path (within the checked-out repo) containing the module composer.json - defaults to the repo root, override to point at a nested fixture. Test/Unit and Test/Integration are expected as subdirectories of this path.'
+      project_path:
+        description: 'Path (within the checked-out repo) to run composer install / phpunit from - defaults to the repo root, override to point at a nested fixture'
         required: false
         type: string
-        default: './extensions/${{ github.event.repository.name }}'
+        default: '.'
+      test_directory:
+        description: 'Directory (relative to project_path) containing unit tests to run'
+        required: false
+        type: string
+        default: './'
+      integration_test_directory:
+        description: 'Directory (relative to project_path/dev/tests/integration) containing integration tests to run'
+        required: false
+        type: string
+        default: '.'
       magento_version:
-        description: 'Magento/Mage-OS Version to test against'
+        description: 'Magento Version to stand up infrastructure against'
         required: false
         type: string
         default: '2.4.8'
-      magento_distribution:
-        description: "Product distribution ('magento' or 'mage-os')"
-        required: false
-        type: string
-        default: 'magento'
-      php_version:
-        description: 'Override the PHP version to test against - defaults to the version computed for magento_version/magento_distribution. Useful when a release supports multiple PHP versions.'
-        required: false
-        type: string
-        default: ''
       run_unit_tests:
-        description: 'Run unit tests (module_path/Test/Unit)'
+        description: 'Run unit tests (test_directory)'
         required: false
         type: boolean
         default: false
       run_integration_tests:
-        description: 'Run Magento integration tests (module_path/Test/Integration)'
+        description: 'Run Magento integration tests (dev/tests/integration)'
         required: false
         type: boolean
         default: false
@@ -52,25 +52,22 @@ jobs:
       rabbitmq: ${{ steps.compute-software-requirements.outputs.rabbitmq }}
       activemq_artemis: ${{ steps.compute-software-requirements.outputs.activemq_artemis }}
     steps:
-      # Referenced OWNER/REPO/PATH@REF instead of checking out + `uses: ./` - the
-      # `access_level: user` grant already resolves this workflow's own YAML cross-repo,
-      # and this uses the same mechanism, unlike an explicit `actions/checkout` of a
-      # different private repo (separate permission model, default GITHUB_TOKEN can't do it -
-      # confirmed via a 404 against the first cross-repo consumer to hit this).
+      # OWNER/REPO/PATH@REF instead of checkout + `uses: ./` - a plain checkout of this
+      # step's own repo actually checks out whatever repo is CALLING this reusable workflow,
+      # not the repo the workflow file itself lives in (GitHub has no context variable
+      # exposing that).
       - name: Compute Software Requirements
         id: compute-software-requirements
         uses: samjuk/github-actions/.github/actions/magento/compute-software-requirements@master
         with:
           magento_version: ${{ inputs.magento_version }}
-          distribution: ${{ inputs.magento_distribution }}
-
 
   phpunit-test:
     name: PHPUnit Test
     runs-on: ubuntu-latest
     needs: compute-software-requirements
     container:
-      image: samjuk/${{ inputs.magento_distribution == 'mage-os' && 'mage-os-ci-testing-env' || 'magento-ci-testing-env' }}:${{ inputs.magento_version }}-php${{ inputs.php_version != '' && inputs.php_version || needs.compute-software-requirements.outputs.php }}
+      image: samjuk/magento-base-ci-testing-env:${{ needs.compute-software-requirements.outputs.php }}
       # https://github.com/actions/runner/issues/878#issuecomment-1290921350
       options:
         --user 1001:1001
@@ -97,64 +94,33 @@ jobs:
           'discovery.type': single-node
           # xpack.security.enabled is an Elasticsearch-only setting; OpenSearch
           # doesn't recognise it and crashes on boot if it's set - removed.
-          # 512m max was fine when this only ever served unit tests (no real Magento
-          # install touches it); run_integration_tests now runs a real ~1575-module
-          # setup:install, so headroom is bumped for whatever indexing work follows.
           'ES_JAVA_OPTS': "-Xms512m -Xmx1g"
           # This image's security plugin enforces HTTPS + basic auth by default, which
-          # Magento's installer never speaks (install-config-mysql.php only configures a
-          # plain host/port). Verified locally: plain HTTP gets "empty reply from server"
-          # with security on, and status:green once disabled - this is what was actually
-          # behind "No alive nodes found in your cluster" during setup:install.
+          # Magento's installer never speaks. See magento2-test-phpunit-module-ghas.yaml
+          # for the full story - same fix applies here.
           'DISABLE_SECURITY_PLUGIN': 'true'
         options: --health-cmd="curl localhost:9200/_cluster/health?wait_for_status=yellow&timeout=60s" --health-start-period=7s --health-interval=10s --health-timeout=5s --health-retries=3
     steps:
-      # https://github.com/actions/runner/issues/878#issuecomment-1290921350
-      - name: Github Jank
-        run: cp -R /var/www/html/* ${{ github.workspace }}/
-
       - name: Environment Information
         run: |
           php -v
           composer --version
 
-      - name: Checkout Local Actions
+      - name: Checkout Project
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
-          path: ./extensions/${{ github.event.repository.name }}
 
-      - name: Check Test Directories
-        id: test-dirs
-        run: |
-          UNIT_EXISTS=false
-          [ -d "${{ inputs.module_path }}/Test/Unit" ] && UNIT_EXISTS=true
-          INTEGRATION_EXISTS=false
-          [ -d "${{ inputs.module_path }}/Test/Integration" ] && INTEGRATION_EXISTS=true
-          echo "unit_exists=${UNIT_EXISTS}" >> "$GITHUB_OUTPUT"
-          echo "integration_exists=${INTEGRATION_EXISTS}" >> "$GITHUB_OUTPUT"
-
-          UNIT_WILL_RUN=false
-          [ "${{ inputs.run_unit_tests }}" = "true" ] && [ "$UNIT_EXISTS" = "true" ] && UNIT_WILL_RUN=true
-          INTEGRATION_WILL_RUN=false
-          [ "${{ inputs.run_integration_tests }}" = "true" ] && [ "$INTEGRATION_EXISTS" = "true" ] && INTEGRATION_WILL_RUN=true
-
-          if { [ "${{ inputs.run_unit_tests }}" = "true" ] || [ "${{ inputs.run_integration_tests }}" = "true" ]; } \
-             && [ "$UNIT_WILL_RUN" = "false" ] && [ "$INTEGRATION_WILL_RUN" = "false" ]; then
-            echo "::error::Tests were requested (run_unit_tests/run_integration_tests) but neither Test/Unit nor Test/Integration exists at ${{ inputs.module_path }}."
-            exit 1
-          fi
-
-      - name: Install Module via Composer
+      - name: Install Project and dependencies
+        working-directory: ${{ inputs.project_path }}
         env:
           COMPOSER_NO_SECURITY_BLOCKING: 1
         run: |
-          EXT_NAME=$(jq -r '.name' "${{ inputs.module_path }}/composer.json")
-          composer config repositories.local path "${{ inputs.module_path }}"
-          composer require -W --prefer-source "${EXT_NAME}:@dev"
+          composer install
 
       - name: Detect PHPUnit Flags
         id: phpunit-flags
+        working-directory: ${{ inputs.project_path }}
         run: |
           # --display-all-issues was added in PHPUnit 10; older Magento versions (2.4.6/2.4.7)
           # pin PHPUnit 9.x and reject the flag outright. Detect at runtime rather than mapping
@@ -165,16 +131,22 @@ jobs:
           echo "flags=${FLAGS}" >> "$GITHUB_OUTPUT"
 
       - name: Run Unit Tests
-        if: ${{ inputs.run_unit_tests && steps.test-dirs.outputs.unit_exists == 'true' }}
+        if: ${{ inputs.run_unit_tests }}
+        working-directory: ${{ inputs.project_path }}
         run: |
-          vendor/bin/phpunit ${{ steps.phpunit-flags.outputs.flags }} "${{ inputs.module_path }}/Test/Unit"
+          vendor/bin/phpunit ${{ steps.phpunit-flags.outputs.flags }} "${{ inputs.test_directory }}"
 
       - name: Run DI Compile
+        working-directory: ${{ inputs.project_path }}
         run: |
+          # A bare composer install never populates app/etc/config.php, so every
+          # module (including core ones) reads as disabled until enabled explicitly.
+          php bin/magento module:enable --all
           php bin/magento setup:di:compile
 
       - name: Configure Integration Test Database
-        if: ${{ inputs.run_integration_tests && steps.test-dirs.outputs.integration_exists == 'true' }}
+        if: ${{ inputs.run_integration_tests }}
+        working-directory: ${{ inputs.project_path }}
         run: |
           cp dev/tests/integration/etc/install-config-mysql.php.dist dev/tests/integration/etc/install-config-mysql.php
           sed -i "s/'db-host' => '.*'/'db-host' => 'mysql'/" dev/tests/integration/etc/install-config-mysql.php
@@ -185,7 +157,8 @@ jobs:
           sed -i "s/'amqp-host' => '.*'/'amqp-host' => ''/" dev/tests/integration/etc/install-config-mysql.php
 
       - name: Skip DB Dump Cache
-        if: ${{ inputs.run_integration_tests && steps.test-dirs.outputs.integration_exists == 'true' }}
+        if: ${{ inputs.run_integration_tests }}
+        working-directory: ${{ inputs.project_path }}
         run: |
           # Post-install, Magento tries to mysqldump the schema for reuse by a later run -
           # never read back within one job anyway. Pre-creating the dump file at its
@@ -196,7 +169,8 @@ jobs:
           touch "tmp/sandbox-0-${SANDBOX_HASH}/setup_dump_magento.sql"
 
       - name: Fix ps for Memory Stats
-        if: ${{ inputs.run_integration_tests && steps.test-dirs.outputs.integration_exists == 'true' }}
+        if: ${{ inputs.run_integration_tests }}
+        working-directory: ${{ inputs.project_path }}
         run: |
           # PHPUnit's shutdown hook shells out to `ps --pid X --format rss --no-headers` for a
           # memory stat, which busybox's ps doesn't support - shim it via /proc/<pid>/status
@@ -215,7 +189,8 @@ jobs:
           echo "${{ github.workspace }}/.ci-bin" >> "$GITHUB_PATH"
 
       - name: Run Integration Tests
-        if: ${{ inputs.run_integration_tests && steps.test-dirs.outputs.integration_exists == 'true' }}
+        if: ${{ inputs.run_integration_tests }}
+        working-directory: ${{ inputs.project_path }}
         run: |
           cd dev/tests/integration
-          ../../../vendor/bin/phpunit ${{ steps.phpunit-flags.outputs.flags }} "../../../${{ inputs.module_path }}/Test/Integration"
+          ../../../vendor/bin/phpunit ${{ steps.phpunit-flags.outputs.flags }} "${{ inputs.integration_test_directory }}"

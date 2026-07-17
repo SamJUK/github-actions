@@ -17,6 +17,7 @@ This repository contains production ready, reusable Github actions and workflows
 | [magento2-test-static](./.github/workflows/magento2-test-static.readme.md) | Handles performing opinionated static analysis against a Magento 2 project
 | [magento-supported-versions](./.github/workflows/magento-supported-versions.readme.md) | Single source of truth for supported Magento versions, for use in a test matrix
 | [magento2-test-phpunit-module-ghas](./.github/workflows/magento2-test-phpunit-module-ghas.readme.md) | PHPUnit tests for a Magento module (unit + DI compile + integration), using GitHub Actions Services - use in place of magento2-test-unit-module-ghas
+| [magento2-test-phpunit-project-ghas](./.github/workflows/magento2-test-phpunit-project-ghas.readme.md) | PHPUnit tests for a Magento project (unit + DI compile + integration), using GitHub Actions Services - use in place of magento2-test-unit-project-ghas
 | [magento2-test-unit-module-ghas](./.github/workflows/magento2-test-unit-module-ghas.readme.md) | Handles running Unit tests against a Magento module, using Github Actions Services
 | [magento2-test-unit-module-warden](./.github/workflows/magento2-test-unit-module-warden.readme.md) | Handles running Unit tests against a Magento module using Warden
 | [magento2-test-unit-project-ghas](./.github/workflows/magento2-test-unit-project-ghas.readme.md) | Handles running Unit tests against a Magento project, using Github Actions Services
