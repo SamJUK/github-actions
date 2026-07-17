@@ -9,15 +9,15 @@ on:
         type: string
         default: '.'
       test_directory:
-        description: 'Directory (relative to project_path) containing unit tests to run'
+        description: 'Glob (relative to project_path, resolved by PHPUnit natively) matching unit test directories to run'
         required: false
         type: string
-        default: './'
+        default: 'app/code/*/*/Test/Unit'
       integration_test_directory:
-        description: 'Directory (relative to project_path/dev/tests/integration) containing integration tests to run'
+        description: 'Glob (relative to project_path, resolved by PHPUnit natively) matching integration test directories to run'
         required: false
         type: string
-        default: '.'
+        default: 'app/code/*/*/Test/Integration'
       magento_version:
         description: 'Magento Version to stand up infrastructure against'
         required: false
@@ -130,11 +130,37 @@ jobs:
           [ "$PHPUNIT_MAJOR" -ge 10 ] && FLAGS="--display-all-issues"
           echo "flags=${FLAGS}" >> "$GITHUB_OUTPUT"
 
+      - name: Configure Unit Test Suite
+        if: ${{ inputs.run_unit_tests }}
+        working-directory: ${{ inputs.project_path }}
+        run: |
+          # PHPUnit's <directory> element natively resolves glob patterns (e.g.
+          # ../../../app/code/*/*/Test/Unit) - injecting a suite scoped to just that into
+          # dev/tests/unit/phpunit.xml.dist reuses Magento's own bootstrap/autoload
+          # wiring without pulling in the stock suite's vendor/magento/module-*
+          # entries (that would run every core module's own unit tests too).
+          cat > /tmp/testsuite-unit.xml << EOF
+                  <testsuite name="Project_Unit_Tests">
+                      <directory>../../../${{ inputs.test_directory }}</directory>
+                  </testsuite>
+          EOF
+          sed -i '/<testsuites>/r /tmp/testsuite-unit.xml' dev/tests/unit/phpunit.xml.dist
+          # PHPUnit 12 (Magento 2.4.9) implicitly enables failOnEmptyTestSuite when
+          # --testsuite is passed - default it off so a project with genuinely zero
+          # app/code unit tests doesn't hard-fail.
+          if ! grep -q 'failOnEmptyTestSuite=' dev/tests/unit/phpunit.xml.dist; then
+            sed -i 's|<phpunit |<phpunit failOnEmptyTestSuite="false" |' dev/tests/unit/phpunit.xml.dist
+          fi
+          # Allure's bootstrap fails without a config file it never ships by default,
+          # turning a clean pass into "OK, but there were issues!" (exit 1).
+          # See https://github.com/magento/magento2/issues/36702
+          sed -i '/<extensions>/,/<\/extensions>/d' dev/tests/unit/phpunit.xml.dist
+
       - name: Run Unit Tests
         if: ${{ inputs.run_unit_tests }}
         working-directory: ${{ inputs.project_path }}
         run: |
-          vendor/bin/phpunit ${{ steps.phpunit-flags.outputs.flags }} "${{ inputs.test_directory }}"
+          vendor/bin/phpunit ${{ steps.phpunit-flags.outputs.flags }} -c dev/tests/unit/phpunit.xml.dist --testsuite Project_Unit_Tests
 
       - name: Run DI Compile
         working-directory: ${{ inputs.project_path }}
@@ -188,9 +214,28 @@ jobs:
           chmod +x "${{ github.workspace }}/.ci-bin/ps"
           echo "${{ github.workspace }}/.ci-bin" >> "$GITHUB_PATH"
 
+      - name: Configure Integration Test Suite
+        if: ${{ inputs.run_integration_tests }}
+        working-directory: ${{ inputs.project_path }}
+        run: |
+          # Same technique as the unit suite - the stock "Magento Integration Tests Real
+          # Suite" also includes Magento's own core testsuite/ directory, which would run
+          # the entire core integration suite alongside app/code's.
+          cat > /tmp/testsuite-integration.xml << EOF
+                  <testsuite name="Project_Integration_Tests">
+                      <directory>../../../${{ inputs.integration_test_directory }}</directory>
+                  </testsuite>
+          EOF
+          sed -i '/<testsuites>/r /tmp/testsuite-integration.xml' dev/tests/integration/phpunit.xml.dist
+          if ! grep -q 'failOnEmptyTestSuite=' dev/tests/integration/phpunit.xml.dist; then
+            sed -i 's|<phpunit |<phpunit failOnEmptyTestSuite="false" |' dev/tests/integration/phpunit.xml.dist
+          fi
+          # See https://github.com/magento/magento2/issues/36702
+          sed -i '/<extensions>/,/<\/extensions>/d' dev/tests/integration/phpunit.xml.dist
+
       - name: Run Integration Tests
         if: ${{ inputs.run_integration_tests }}
         working-directory: ${{ inputs.project_path }}
         run: |
           cd dev/tests/integration
-          ../../../vendor/bin/phpunit ${{ steps.phpunit-flags.outputs.flags }} "${{ inputs.integration_test_directory }}"
+          ../../../vendor/bin/phpunit ${{ steps.phpunit-flags.outputs.flags }} -c phpunit.xml.dist --testsuite Project_Integration_Tests
