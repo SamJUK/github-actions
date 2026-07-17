@@ -1006,6 +1006,21 @@
             "varnish": "7.7",
             "apache": "--",
             "nginx": "--"
+        },
+        "1.0.5": {
+            "composer": "2.8",
+            "opensearch": "2.19",
+            "elasticsearch": "--",
+            "mariadb": "10.6",
+            "mysql": "8.0",
+            "php": "8.3",
+            "rabbitmq": "4.2",
+            "activemq_artemis": "--",
+            "redis": "7.2",
+            "valkey": "8",
+            "varnish": "7.7",
+            "apache": "--",
+            "nginx": "--"
         }
     }
 }
