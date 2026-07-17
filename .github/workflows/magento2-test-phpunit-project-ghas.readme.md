@@ -2,15 +2,15 @@
 
 This workflow runs PHPUnit-based tests against a full Magento project (a repo that already commits its own `composer.json`/`composer.lock` - e.g. a real storefront project, not a standalone module), using Github Actions Services. `setup:di:compile` always runs after install. Unit and integration tests are each opt-in via `run_unit_tests`/`run_integration_tests` (both default `false`).
 
-Unlike the module variant, a project has no fixed test layout, so `test_directory` (unit tests, relative to `project_path`) and `integration_test_directory` (relative to `project_path/dev/tests/integration`) are both explicit overridable inputs rather than a derived convention.
+`test_directory` and `integration_test_directory` (both default `app/code/*/*/Test/Unit`/`app/code/*/*/Test/Integration`, relative to `project_path`) are globs targeting every custom module under `app/code`, not one specific module. Resolved natively by PHPUnit's `<directory>` element (injected into `dev/tests/unit/phpunit.xml.dist`/`dev/tests/integration/phpunit.xml.dist` as a scoped `Project_*_Tests` suite, with the `project_path` -> `dev/tests/{unit,integration}` traversal added automatically) rather than shell-expanded - Magento's own stock suites can't be reused directly since they also pull in `vendor/magento/module-*` (unit) or the core `testsuite/` directory (integration), which would run the entire core suite alongside your own code.
 
 `project_path` (default `.`) points at the checked-out project's own directory — override it if the project lives somewhere other than the checkout root.
 
-2.4.4 and earlier aren't supported for `run_integration_tests` - those versions default to `search-engine: elasticsearch7`/`elasticsearch-host` instead of `opensearch-host`, which this workflow doesn't account for, so search installation fails. Already excluded from [magento-supported-versions](./magento-supported-versions.readme.md)'s base list for this reason - don't `include:` it back in for a consumer that enables `run_integration_tests`.
+Unlike the module variant, a project pins its own exact Magento version via its committed `composer.lock` (`composer install`, not `composer require` against a floating version) - `magento_version` should be hardcoded to match that pin, not driven from [magento-supported-versions](./magento-supported-versions.readme.md)'s matrix, which the project's lock file can't flex across.
+
+2.4.4 and earlier aren't supported for `run_integration_tests` - those versions default to `search-engine: elasticsearch7`/`elasticsearch-host` instead of `opensearch-host`, which this workflow doesn't account for, so search installation fails.
 
 ## Usage
-
-Get the version matrix from [magento-supported-versions](./magento-supported-versions.readme.md) rather than hardcoding one, so every consumer picks up support changes automatically:
 
 ```yaml
 name: My Workflow
@@ -22,19 +22,12 @@ on:
 
 jobs:
   # ... stuff
-  supported-versions:
-    uses: samjuk/github-actions/.github/workflows/magento-supported-versions.yaml@master
-
   phpunit-tests-ghas:
     name: PHPUnit Tests (GHAS)
     uses: samjuk/github-actions/.github/workflows/magento2-test-phpunit-project-ghas.yaml@master
-    needs: [static, supported-versions]
+    needs: static
     with:
-      magento_version: ${{ matrix.magento_version }}
+      magento_version: '2.4.8-p5' # match this project's own composer.lock pin
       run_unit_tests: true
       run_integration_tests: true
-    strategy:
-      fail-fast: false
-      matrix:
-        magento_version: ${{ fromJson(needs.supported-versions.outputs.versions) }}
 ```

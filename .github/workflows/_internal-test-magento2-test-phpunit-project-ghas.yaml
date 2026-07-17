@@ -20,12 +20,12 @@ jobs:
     uses: ./.github/workflows/magento2-test-phpunit-project-ghas.yaml
     with:
       project_path: ./.github/fixtures/demo-project
-      test_directory: ./Test/Unit
+      test_directory: Test/Unit
       run_unit_tests: true
 
   test-integration-tests:
     uses: ./.github/workflows/magento2-test-phpunit-project-ghas.yaml
     with:
       project_path: ./.github/fixtures/demo-project
-      integration_test_directory: ./testsuite/SamJUK/DemoProject
+      integration_test_directory: dev/tests/integration/testsuite/SamJUK/DemoProject
       run_integration_tests: true
