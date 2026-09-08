@@ -34,7 +34,7 @@ jobs:
         run: |
           # Single place to bump the org-wide Magento/Mage-OS support matrix on new releases.
           # Entries are "distribution:version" - Mage-OS versions don't correlate with
-          # Magento's numbering (e.g. 3.2.0 vs 2.4.9), so distribution disambiguates.
+          # Magento's numbering (e.g. 3.5.0 vs 2.4.9), so distribution disambiguates.
           # 2.4.4 dropped: defaults to search-engine: elasticsearch7/elasticsearch-host,
           # which the phpunit-* workflows' integration-test config doesn't account for.
           BASE_ENTRIES=(
@@ -42,7 +42,7 @@ jobs:
             magento:2.4.8-p5
             magento:2.4.7-p10
             magento:2.4.6-p15
-            mage-os:3.2.0
+            mage-os:3.5.0
           )
 
           # include/exclude lines may be "distribution:version" or a bare version (implies
