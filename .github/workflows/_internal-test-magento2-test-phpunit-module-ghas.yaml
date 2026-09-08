@@ -63,7 +63,7 @@ jobs:
     with:
       module_path: ./extensions/${{ github.event.repository.name }}/.github/fixtures/demo-package-unit-only
       magento_distribution: 'mage-os'
-      magento_version: '3.2.0'
+      magento_version: '3.5.0'
       run_unit_tests: true
 
   # php_version override - 2.4.8 computes to php8.4, but samjuk/magento-ci-testing-env
