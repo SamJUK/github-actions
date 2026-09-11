@@ -47,6 +47,7 @@ on:
 jobs:
   compute-software-requirements:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     outputs:
       composer: ${{ steps.compute-software-requirements.outputs.composer }}
       php: ${{ steps.compute-software-requirements.outputs.php }}
@@ -76,6 +77,7 @@ jobs:
   phpunit-test:
     name: PHPUnit Test
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: compute-software-requirements
     container:
       image: samjuk/magento-base-ci-testing-env:${{ inputs.php_version != '' && inputs.php_version || needs.compute-software-requirements.outputs.php }}

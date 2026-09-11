@@ -11,6 +11,10 @@ on:
       - .github/workflows/magento-supported-versions.yaml
       - .github/workflows/_internal-test-magento-supported-versions.yaml
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   default:
     uses: ./.github/workflows/magento-supported-versions.yaml
@@ -37,6 +41,7 @@ jobs:
     name: Assert
     needs: [default, include-exclude, distribution-scoped]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Assert default list
         shell: bash

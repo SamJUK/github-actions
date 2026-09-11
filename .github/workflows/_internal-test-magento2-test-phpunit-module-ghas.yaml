@@ -24,6 +24,10 @@ on:
 # Verified manually instead by running the Check Test Directories step's exact logic locally
 # against all three fixtures - see commit history for the transcript.
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-unit-tests:
     uses: ./.github/workflows/magento2-test-phpunit-module-ghas.yaml

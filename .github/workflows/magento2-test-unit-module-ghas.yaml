@@ -27,6 +27,7 @@ on:
 jobs:
   compute-software-requirements:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     outputs:
       composer: ${{ steps.compute-software-requirements.outputs.composer }}
       php: ${{ steps.compute-software-requirements.outputs.php }}
@@ -53,6 +54,7 @@ jobs:
 
   unit-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: compute-software-requirements
     container:
       image: samjuk/magento-ci-testing-env:${{ inputs.magento_version }}-php${{ needs.compute-software-requirements.outputs.php }}

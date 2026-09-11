@@ -22,6 +22,7 @@ jobs:
   compute:
     name: Compute Supported Versions
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     outputs:
       versions: ${{ steps.compute.outputs.versions }}
     steps:
