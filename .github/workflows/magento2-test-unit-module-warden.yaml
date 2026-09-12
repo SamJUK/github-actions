@@ -19,10 +19,16 @@ on:
         type: string
         default: 'https://mage-os.hypernode.com/mirror/'
 
+      timeout_minutes:
+        description: 'Per-job timeout. Raise it for a large integration suite; the default only exists to stop a hung job running to GitHub''s 360 minute ceiling.'
+        required: false
+        type: number
+        default: 60
+
 jobs:
   compute-software-requirements:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: ${{ inputs.timeout_minutes }}
     outputs:
       composer: ${{ steps.compute-software-requirements.outputs.composer }}
       php: ${{ steps.compute-software-requirements.outputs.php }}
@@ -50,7 +56,7 @@ jobs:
 
   unit-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: ${{ inputs.timeout_minutes }}
     needs: compute-software-requirements
     
     steps:
