@@ -34,10 +34,16 @@ on:
         default: "5"
         description: "PHPStan analysis level"
 
+      timeout_minutes:
+        description: 'Per-job timeout. Raise it for a large integration suite; the default only exists to stop a hung job running to GitHub''s 360 minute ceiling.'
+        required: false
+        type: number
+        default: 60
+
 jobs:
   phpcs:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: ${{ inputs.timeout_minutes }}
     steps:
       - name: Setup PHP
         uses: shivammathur/setup-php@8358ee0e2e8afe63c2fb8253d1d52085811ab1e5 # v2
@@ -119,7 +125,7 @@ jobs:
 
   phpstan:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: ${{ inputs.timeout_minutes }}
     steps:
       - name: Setup PHP
         uses: shivammathur/setup-php@8358ee0e2e8afe63c2fb8253d1d52085811ab1e5 # v2

@@ -34,10 +34,16 @@ on:
         type: boolean
         default: false
 
+      timeout_minutes:
+        description: 'Per-job timeout. Raise it for a large integration suite; the default only exists to stop a hung job running to GitHub''s 360 minute ceiling.'
+        required: false
+        type: number
+        default: 60
+
 jobs:
   compute-software-requirements:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: ${{ inputs.timeout_minutes }}
     outputs:
       composer: ${{ steps.compute-software-requirements.outputs.composer }}
       php: ${{ steps.compute-software-requirements.outputs.php }}
@@ -69,7 +75,7 @@ jobs:
   phpunit-test:
     name: PHPUnit Test
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: ${{ inputs.timeout_minutes }}
     needs: compute-software-requirements
     container:
       image: samjuk/${{ inputs.magento_distribution == 'mage-os' && 'mage-os-ci-testing-env' || 'magento-ci-testing-env' }}:${{ inputs.magento_version }}-php${{ inputs.php_version != '' && inputs.php_version || needs.compute-software-requirements.outputs.php }}
