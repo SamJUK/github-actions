@@ -13,16 +13,15 @@ on:
         required: false
         type: string
         default: ''
-    outputs:
-      versions:
-        description: 'JSON array of {distribution, version} objects, for use in a matrix (fromJson(...))'
-        value: ${{ jobs.compute.outputs.versions }}
-
       timeout_minutes:
         description: 'Per-job timeout. Raise it for a large integration suite; the default only exists to stop a hung job running to GitHub''s 360 minute ceiling.'
         required: false
         type: number
         default: 60
+    outputs:
+      versions:
+        description: 'JSON array of {distribution, version} objects, for use in a matrix (fromJson(...))'
+        value: ${{ jobs.compute.outputs.versions }}
 
 jobs:
   compute:
