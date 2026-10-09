@@ -158,6 +158,18 @@ jobs:
         with:
           fetch-depth: 0
 
+      # composer install was 66s of luma's PHPUnit job, downloading every package each run.
+      - name: Composer Cache Directory
+        id: composer-cache
+        run: echo "dir=$(composer config --global cache-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer Downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: composer-
+
       - name: Install Project and dependencies
         working-directory: ${{ inputs.project_path }}
         env:
