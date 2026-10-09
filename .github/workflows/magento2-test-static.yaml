@@ -49,7 +49,6 @@ jobs:
         uses: shivammathur/setup-php@8358ee0e2e8afe63c2fb8253d1d52085811ab1e5 # v2
         with:
           php-version: ${{ inputs.php_version }}
-          tools: phpcs
 
       - name: Setup Magento Mirror
         if: ${{ inputs.magento_mirror != '' }}
@@ -73,8 +72,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Only when the repository has no ruleset of its own; PHPCS picks one up from the working
+      # directory when --standard is not passed.
       - name: Create shared PHPCS ruleset
-        if: ${{ inputs.phpcs_write_config }}
+        if: ${{ inputs.phpcs_write_config && hashFiles('.phpcs.xml', 'phpcs.xml', '.phpcs.xml.dist', 'phpcs.xml.dist') == '' }}
         run: |
           cat <<'EOF' > phpcs.xml
           <?xml version="1.0"?>
@@ -121,7 +122,7 @@ jobs:
 
       - name: Run PHPCS
         run: |
-          phpcs --standard=phpcs.xml --extensions=php,phtml -p ${{ inputs.directory }} --severity=${{ inputs.phpcs_severity }}
+          phpcs --extensions=php,phtml -p ${{ inputs.directory }} --severity=${{ inputs.phpcs_severity }}
 
   phpstan:
     runs-on: ubuntu-latest
