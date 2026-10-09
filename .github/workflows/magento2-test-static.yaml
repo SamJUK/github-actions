@@ -28,11 +28,6 @@ on:
         type: boolean
         default: true
         description: "Whether to write a shared PHPCS config file"
-      phpstan_level:
-        required: false
-        type: string
-        default: "5"
-        description: "PHPStan analysis level"
 
       timeout_minutes:
         description: 'Per-job timeout. Raise it for a large integration suite; the default only exists to stop a hung job running to GitHub''s 360 minute ceiling.'
@@ -123,45 +118,3 @@ jobs:
       - name: Run PHPCS
         run: |
           phpcs --extensions=php,phtml -p ${{ inputs.directory }} --severity=${{ inputs.phpcs_severity }}
-
-  phpstan:
-    runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.timeout_minutes }}
-    steps:
-      - name: Setup PHP
-        uses: shivammathur/setup-php@8358ee0e2e8afe63c2fb8253d1d52085811ab1e5 # v2
-        with:
-          php-version: ${{ inputs.php_version }}
-          tools: phpstan
-
-      - name: Setup Magento Mirror
-        if: ${{ inputs.magento_mirror != '' }}
-        run: |
-          composer config --global repositories.magentomirror composer "${{ inputs.magento_mirror }}" && \
-          composer config --global --no-plugins allow-plugins.phpstan/extension-installer true && \
-          composer config --global --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true && \
-          composer config --global --no-plugins allow-plugins.magento/* true && \
-          composer config --global --no-plugins allow-plugins.laminas/laminas-dependency-plugin true && \
-          composer config --global --no-plugins allow-plugins.php-http/discovery true && \
-          composer config --global --no-plugins allow-plugins.phpro/grumphp true
-
-      - name: Install PHPStan Magento Extension
-        run: |
-          composer global config --no-plugins allow-plugins.phpstan/extension-installer true
-          composer global require phpstan/extension-installer
-          composer global require bitexpert/phpstan-magento
-
-      - name: Checkout Code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          fetch-depth: 0
-
-      - name: Write default phpstan.neon if missing
-        run: |
-          if [ ! -f phpstan.neon ]; then
-             echo "" > phpstan.neon;
-          fi
-
-      - name: Run PHPStan
-        run: |
-          phpstan analyse ${{ inputs.directory }} --level=${{ inputs.phpstan_level }} || true

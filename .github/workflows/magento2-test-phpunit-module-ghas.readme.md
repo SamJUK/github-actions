@@ -12,6 +12,8 @@ This workflow runs PHPUnit-based tests against a Magento module, using Github Ac
 
 `php_version` overrides the PHP version used for the container image - defaults to whatever's computed for `magento_version`/`magento_distribution`. Useful for a release that officially supports multiple PHP versions and you want to pin/test a specific one.
 
+`run_phpstan` (default `false`) runs PHPStan at `phpstan_level` (default `5`) against `module_path`, inside the same container, so Magento's classes resolve. It replaces the PHPStan job that used to live in [magento2-test-static](./magento2-test-static.readme.md), which had no Magento to resolve against and could only pass. Errors show as annotations on the PR. Running it per matrix entry also catches calls to APIs an older Magento version does not have.
+
 ## Usage
 
 Get the version matrix from [magento-supported-versions](./magento-supported-versions.readme.md) rather than hardcoding one, so every consumer picks up support changes automatically:
