@@ -222,14 +222,6 @@ jobs:
         run: |
           vendor/bin/phpunit ${{ steps.phpunit-flags.outputs.flags }} -c dev/tests/unit/phpunit.xml.dist --testsuite Project_Unit_Tests
 
-      - name: Run DI Compile
-        working-directory: ${{ inputs.project_path }}
-        run: |
-          # A bare composer install never populates app/etc/config.php, so every
-          # module (including core ones) reads as disabled until enabled explicitly.
-          php bin/magento module:enable --all
-          php bin/magento setup:di:compile
-
       - name: Configure Integration Test Database
         if: ${{ inputs.run_integration_tests }}
         working-directory: ${{ inputs.project_path }}
