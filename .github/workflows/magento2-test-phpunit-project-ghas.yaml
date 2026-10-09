@@ -19,15 +19,15 @@ on:
         type: string
         default: 'app/code/*/*/Test/Integration'
       magento_version:
-        description: 'Magento/Mage-OS Version to stand up infrastructure against'
+        description: 'Magento/Mage-OS version to stand up infrastructure against - defaults to the product-community-edition version in project_path/composer.lock'
         required: false
         type: string
-        default: '2.4.8'
+        default: ''
       magento_distribution:
-        description: "Product distribution ('magento' or 'mage-os')"
+        description: "Product distribution ('magento' or 'mage-os') - defaults to the one in project_path/composer.lock, or 'magento' when magento_version is given"
         required: false
         type: string
-        default: 'magento'
+        default: ''
       php_version:
         description: 'Override the PHP version to test against - defaults to the version computed for magento_version/magento_distribution. Useful when a release supports multiple PHP versions.'
         required: false
@@ -69,6 +69,30 @@ jobs:
       rabbitmq: ${{ steps.compute-software-requirements.outputs.rabbitmq }}
       activemq_artemis: ${{ steps.compute-software-requirements.outputs.activemq_artemis }}
     steps:
+      - name: Checkout Project
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      # From the lock file rather than an input that drifts: mage-os-site tested against
+      # 1.0.5's PHP and services while running 3.2.0.
+      - name: Detect Magento Version
+        id: detect
+        env:
+          VERSION: ${{ inputs.magento_version }}
+          DISTRIBUTION: ${{ inputs.magento_distribution }}
+          LOCK: ${{ inputs.project_path }}/composer.lock
+        run: |
+          if [ -z "$VERSION" ]; then
+            FOUND=$(jq -r '.packages[] | select(.name | test("^(magento|mage-os)/product-community-edition$")) | "\(.name | split("/")[0]) \(.version)"' "$LOCK")
+            DISTRIBUTION=${FOUND% *}
+            VERSION=${FOUND#* }
+          fi
+          if [ -z "$VERSION" ]; then
+            echo "::error::No magento_version input and no product-community-edition in $LOCK"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "distribution=${DISTRIBUTION:-magento}" >> "$GITHUB_OUTPUT"
+
       # OWNER/REPO/PATH@REF instead of checkout + `uses: ./` - a plain checkout of this
       # step's own repo actually checks out whatever repo is CALLING this reusable workflow,
       # not the repo the workflow file itself lives in (GitHub has no context variable
@@ -77,8 +101,8 @@ jobs:
         id: compute-software-requirements
         uses: samjuk/github-actions/.github/actions/magento/compute-software-requirements@master
         with:
-          magento_version: ${{ inputs.magento_version }}
-          distribution: ${{ inputs.magento_distribution }}
+          magento_version: ${{ steps.detect.outputs.version }}
+          distribution: ${{ steps.detect.outputs.distribution }}
 
   phpunit-test:
     name: PHPUnit Test
