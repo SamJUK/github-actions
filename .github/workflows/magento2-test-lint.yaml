@@ -43,6 +43,13 @@ jobs:
       - name: Validating Composer
         run: composer validate --no-check-publish
 
+      # Projects commit a lock file, modules usually don't. --ignore-unreachable skips private
+      # repositories (repo.magento.com, Hyvä's Packagist) that would 401 without credentials;
+      # advisories come from packagist.org either way.
+      - name: Composer Audit
+        if: hashFiles('composer.lock') != ''
+        run: composer audit --locked --abandoned=report --ignore-unreachable
+
       # .phtml too: a broken template is never compiled by setup:di:compile or static content deploy,
       # so it only fails on the page that renders it.
       - name: Lint PHP Files
