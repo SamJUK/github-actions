@@ -49,6 +49,10 @@ on:
         required: false
         type: number
         default: 60
+    secrets:
+      COMPOSER_AUTH:
+        description: 'auth.json contents for private repositories (repo.magento.com, Hyvä), so they need not be committed'
+        required: false
 
 jobs:
   compute-software-requirements:
@@ -158,6 +162,7 @@ jobs:
         working-directory: ${{ inputs.project_path }}
         env:
           COMPOSER_NO_SECURITY_BLOCKING: 1
+          COMPOSER_AUTH: ${{ secrets.COMPOSER_AUTH }}
         run: |
           composer install
 

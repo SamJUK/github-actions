@@ -10,6 +10,8 @@ Unlike the module variant, a project pins its own exact Magento version via its 
 
 The distribution swaps the `compute-software-requirements` lookup to the `mage-os` manifest key. Unlike the module variant there's no container image to swap (this workflow's container is a distribution-agnostic PHP runtime, not a pre-built Magento install), so this only affects the computed PHP/service versions. `php_version` overrides the computed PHP version, same as the module variant.
 
+Pass a `COMPOSER_AUTH` secret (the contents of `auth.json`) when the project needs private repositories such as repo.magento.com or Hyvä's Packagist. With `secrets: inherit` a repository secret of that name is picked up as is. Composer ignores it when empty.
+
 2.4.4 and earlier aren't supported for `run_integration_tests` - those versions default to `search-engine: elasticsearch7`/`elasticsearch-host` instead of `opensearch-host`, which this workflow doesn't account for, so search installation fails.
 
 ## Usage
