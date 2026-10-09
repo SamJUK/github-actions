@@ -25,18 +25,14 @@ on:
         type: number
         default: 60
 
+# One job, not four: each check takes seconds, but every job bills a whole minute plus a VM boot.
 jobs:
-  composer:
+  lint:
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout_minutes }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          fetch-depth: 0
-          sparse-checkout: |
-            composer.json
-            composer.lock
 
       - name: Set PHP & Composer Version
         uses: shivammathur/setup-php@8358ee0e2e8afe63c2fb8253d1d52085811ab1e5 # v2
@@ -47,57 +43,17 @@ jobs:
       - name: Validating Composer
         run: composer validate --no-check-publish
 
-  php:
-    runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.timeout_minutes }}
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          fetch-depth: 0
-
-      - name: Set PHP Version
-        uses: shivammathur/setup-php@8358ee0e2e8afe63c2fb8253d1d52085811ab1e5 # v2
-        with:
-          php-version: ${{ inputs.php_version }}
-
+      # .phtml too: a broken template is never compiled by setup:di:compile or static content deploy,
+      # so it only fails on the page that renders it.
       - name: Lint PHP Files
         run: |
           set +e
-          find ${{ inputs.directory }} -type f -name '*.php' -exec php -l {} 2>&1 \; | grep -v "^No syntax errors detected"
+          find ${{ inputs.directory }} -type f \( -name '*.php' -o -name '*.phtml' \) -exec php -d display_errors=stderr -l {} \; 2>&1 | grep -v "^No syntax errors detected"
           test $? -eq 0 && exit 1 || exit 0
 
-  yaml:
-    runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.timeout_minutes }}
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          fetch-depth: 0
-
-      - name: Lint YAML Files
-        run: |
-          exit 0 # TODO
-          # set +e
-          # find ${{ inputs.directory }} -type f \( -name '*.yml' -o -name '*.yaml' \) -exec yamllint {} \; 
-          # test $? -eq 0 && exit 1 || exit 0
-
-  xml:
-    runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.timeout_minutes }}
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          fetch-depth: 0
-
-      # - name: Install Tooling
-      #   run: sudo apt-get install libxml2-utils -y
-
+      # Well-formedness only. Malformed layout XML, like a broken template, only fails at runtime.
       - name: Lint XML Files
         run: |
-          exit 0 # TODO
-          # set +e
-          # find ${{ inputs.directory }} -type f -name '*.xml' -exec xmllint --noout {} \; 
-          # test $? -eq 0 && exit 1 || exit 0
+          # shellcheck disable=SC2016 # single quotes on purpose: PHP code, not shell
+          find ${{ inputs.directory }} -type f -name '*.xml' -print0 \
+            | xargs -0 -r php -d display_errors=stderr -r '$failed = 0; foreach (array_slice($argv, 1) as $file) { $failed |= !(new DOMDocument())->load($file); } exit($failed);'
