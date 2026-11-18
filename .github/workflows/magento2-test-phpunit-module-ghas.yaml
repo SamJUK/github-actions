@@ -177,8 +177,14 @@ jobs:
         run: |
           vendor/bin/phpunit ${{ steps.phpunit-flags.outputs.flags }} "${{ inputs.module_path }}/Test/Unit"
 
+      # composer require alone leaves the module disabled, so the compile would skip its di.xml.
       - name: Run DI Compile
+        env:
+          INPUTS_MODULE_PATH: ${{ inputs.module_path }}
         run: |
+          # shellcheck disable=SC2016 # PHP code, not shell
+          MODULE_NAME=$(php -r 'echo simplexml_load_file($argv[1])->module["name"];' "${INPUTS_MODULE_PATH}/etc/module.xml")
+          php bin/magento module:enable "$MODULE_NAME"
           php bin/magento setup:di:compile
 
       - name: Configure Integration Test Database
