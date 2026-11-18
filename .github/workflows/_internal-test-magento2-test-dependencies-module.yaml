@@ -1,0 +1,34 @@
+name: Test magento2-test-dependencies-module
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/magento2-test-dependencies-module.yaml
+      - .github/workflows/_internal-test-magento2-test-dependencies-module.yaml
+      - .github/fixtures/demo-package-unit-only/**
+  pull_request:
+    paths:
+      - .github/workflows/magento2-test-dependencies-module.yaml
+      - .github/workflows/_internal-test-magento2-test-dependencies-module.yaml
+      - .github/fixtures/demo-package-unit-only/**
+
+# The failing case (a class from Magento_Catalog with no composer or module.xml entry) can't be
+# asserted here, for the same reason as in _internal-test-magento2-test-phpunit-module-ghas.yaml.
+# It was proven on the pull request that added this workflow.
+
+permissions:
+  contents: read
+
+jobs:
+  test-declared-dependencies:
+    uses: ./.github/workflows/magento2-test-dependencies-module.yaml
+    with:
+      module_path: ./extensions/${{ github.event.repository.name }}/.github/fixtures/demo-package-unit-only
+
+  test-mageos-compat:
+    uses: ./.github/workflows/magento2-test-dependencies-module.yaml
+    with:
+      module_path: ./extensions/${{ github.event.repository.name }}/.github/fixtures/demo-package-unit-only
+      magento_distribution: 'mage-os'
+      magento_version: '3.2.0'

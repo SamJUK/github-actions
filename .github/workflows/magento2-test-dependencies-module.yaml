@@ -1,0 +1,103 @@
+name: Dependency Check - Module
+
+on:
+  workflow_call:
+    inputs:
+      module_path:
+        description: 'Path (within the checked-out repo) containing the module composer.json and etc/module.xml'
+        required: false
+        type: string
+        default: './extensions/${{ github.event.repository.name }}'
+      magento_version:
+        description: 'Magento/Mage-OS version to install the module into. One version is enough: declared dependencies do not change per version'
+        required: false
+        type: string
+        default: '2.4.8'
+      magento_distribution:
+        description: "Product distribution ('magento' or 'mage-os')"
+        required: false
+        type: string
+        default: 'magento'
+      hide_needless:
+        description: 'Hide "possibly not needed" findings. On by default, as the checker reports require-dev tools (PHPCS, PHPStan) as not needed'
+        required: false
+        type: boolean
+        default: true
+      timeout_minutes:
+        description: 'Per-job timeout'
+        required: false
+        type: number
+        default: 20
+
+jobs:
+  compute-software-requirements:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes }}
+    outputs:
+      php: ${{ steps.compute-software-requirements.outputs.php }}
+    steps:
+      - name: Compute Software Requirements
+        id: compute-software-requirements
+        uses: samjuk/github-actions/.github/actions/magento/compute-software-requirements@master
+        with:
+          magento_version: ${{ inputs.magento_version }}
+          distribution: ${{ inputs.magento_distribution }}
+
+  extension-checker:
+    name: ExtensionChecker
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes }}
+    needs: compute-software-requirements
+    container:
+      image: samjuk/${{ inputs.magento_distribution == 'mage-os' && 'mage-os-ci-testing-env' || 'magento-ci-testing-env' }}:${{ inputs.magento_version }}-php${{ needs.compute-software-requirements.outputs.php }}
+      # https://github.com/actions/runner/issues/878#issuecomment-1290921350
+      options:
+        --user 1001:1001
+        -v "${{github.workspace}}":"${{github.workspace}}"
+    steps:
+      # https://github.com/actions/runner/issues/878#issuecomment-1290921350
+      - name: Github Jank
+        run: cp -R /var/www/html/* ${{ github.workspace }}/
+
+      - name: Checkout Module
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: ./extensions/${{ github.event.repository.name }}
+          persist-credentials: false
+
+      - name: Install Module and ExtensionChecker
+        env:
+          COMPOSER_NO_SECURITY_BLOCKING: 1
+          MODULE_PATH: ${{ inputs.module_path }}
+        run: |
+          EXT_NAME=$(jq -r '.name' "$MODULE_PATH/composer.json")
+          # shellcheck disable=SC2016 # PHP code, not shell
+          MODULE_NAME=$(php -r 'echo simplexml_load_file($argv[1])->module["name"];' "$MODULE_PATH/etc/module.xml")
+          echo "MODULE_NAME=$MODULE_NAME" >> "$GITHUB_ENV"
+          composer config repositories.local path "$MODULE_PATH"
+          # ponytail: pinned exactly, it runs inside CI with the module's code
+          composer require -W --prefer-source "${EXT_NAME}:@dev" yireo/magento2-extensionchecker:2.6.1
+          # Some images point the cache at a Redis host this job does not have; fall back to files.
+          # shellcheck disable=SC2016 # PHP code, not shell
+          php -r '$f = "app/etc/env.php"; $c = include $f; unset($c["cache"]); file_put_contents($f, "<?php\nreturn " . var_export($c, true) . ";\n");'
+          php bin/magento module:enable "$MODULE_NAME" Yireo_ExtensionChecker
+
+      # bin/magento only loads module commands in an installed app, which needs a database.
+      # The scan only reads files, so run the command class straight from the ObjectManager.
+      - name: Scan Dependencies
+        env:
+          HIDE_NEEDLESS: ${{ inputs.hide_needless && '1' || '0' }}
+        run: |
+          cat > extensionchecker-scan.php <<'PHP'
+          <?php
+          use Magento\Framework\App\Bootstrap;
+          use Symfony\Component\Console\Input\ArgvInput;
+          use Symfony\Component\Console\Output\ConsoleOutput;
+          use Yireo\ExtensionChecker\Console\Command\ScanCommand;
+
+          require 'app/bootstrap.php';
+          $command = Bootstrap::create(BP, $_SERVER)->getObjectManager()->get(ScanCommand::class);
+          exit($command->run(new ArgvInput(array_merge(['scan'], array_slice($argv, 1))), new ConsoleOutput()));
+          PHP
+          # The licence check flags anything but OSL/AFL/MIT, which fails every proprietary module.
+          php extensionchecker-scan.php --module "$MODULE_NAME" --hide-needless "$HIDE_NEEDLESS" --skip-license-check 1
