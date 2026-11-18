@@ -155,12 +155,31 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Write default phpstan.neon if missing
-        run: |
-          if [ ! -f phpstan.neon ]; then
-             echo "" > phpstan.neon;
-          fi
+      - name: Install Module Dependencies
+        working-directory: ${{ inputs.directory }}
+        env:
+          COMPOSER_NO_SECURITY_BLOCKING: 1
+        # A module's lock file never reaches a store, so resolve from composer.json as a store would.
+        run: composer update --no-interaction --no-progress
 
+      # Only what the module declares is installed, so an undeclared dependency fails here too.
+      # The module's own phpstan.neon(.dist) wins; phpstan_level only applies without one.
       - name: Run PHPStan
+        working-directory: ${{ inputs.directory }}
+        env:
+          INPUTS_PHPSTAN_LEVEL: ${{ inputs.phpstan_level }}
         run: |
-          phpstan analyse ${{ inputs.directory }} --level=${{ inputs.phpstan_level }} || true
+          CONFIG=""
+          for f in phpstan.neon phpstan.neon.dist; do [ -f "$f" ] && CONFIG=$f && break; done
+          {
+            [ -n "$CONFIG" ] && printf 'includes:\n    - %s\n' "$CONFIG"
+            echo 'parameters:'
+            echo '    bootstrapFiles: [vendor/autoload.php]'
+            # Integration tests use Magento\TestFramework, which only exists inside a Magento install.
+            echo '    excludePaths: [vendor, Test/Integration (?)]'
+            [ -z "$CONFIG" ] && echo "    level: $INPUTS_PHPSTAN_LEVEL"
+            grep -qsE '^\s+paths:' "$CONFIG" || echo '    paths: [.]'
+          } > phpstan.ci.neon
+          PHPSTAN=phpstan
+          [ -x vendor/bin/phpstan ] && PHPSTAN=vendor/bin/phpstan
+          "$PHPSTAN" analyse --no-progress --configuration phpstan.ci.neon
