@@ -19,15 +19,15 @@ on:
         type: string
         default: 'app/code/*/*/Test/Integration'
       magento_version:
-        description: 'Magento/Mage-OS Version to stand up infrastructure against'
+        description: 'Magento/Mage-OS version to stand up infrastructure against - defaults to the product-community-edition version in project_path/composer.lock'
         required: false
         type: string
-        default: '2.4.8'
+        default: ''
       magento_distribution:
-        description: "Product distribution ('magento' or 'mage-os')"
+        description: "Product distribution ('magento' or 'mage-os') - defaults to the one in project_path/composer.lock, or 'magento' when magento_version is given"
         required: false
         type: string
-        default: 'magento'
+        default: ''
       php_version:
         description: 'Override the PHP version to test against - defaults to the version computed for magento_version/magento_distribution. Useful when a release supports multiple PHP versions.'
         required: false
@@ -49,6 +49,10 @@ on:
         required: false
         type: number
         default: 60
+    secrets:
+      COMPOSER_AUTH:
+        description: 'auth.json contents for private repositories (repo.magento.com, Hyvä), so they need not be committed'
+        required: false
 
 jobs:
   compute-software-requirements:
@@ -69,6 +73,30 @@ jobs:
       rabbitmq: ${{ steps.compute-software-requirements.outputs.rabbitmq }}
       activemq_artemis: ${{ steps.compute-software-requirements.outputs.activemq_artemis }}
     steps:
+      - name: Checkout Project
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      # From the lock file rather than an input that drifts: mage-os-site tested against
+      # 1.0.5's PHP and services while running 3.2.0.
+      - name: Detect Magento Version
+        id: detect
+        env:
+          VERSION: ${{ inputs.magento_version }}
+          DISTRIBUTION: ${{ inputs.magento_distribution }}
+          LOCK: ${{ inputs.project_path }}/composer.lock
+        run: |
+          if [ -z "$VERSION" ]; then
+            FOUND=$(jq -r '.packages[] | select(.name | test("^(magento|mage-os)/product-community-edition$")) | "\(.name | split("/")[0]) \(.version)"' "$LOCK")
+            DISTRIBUTION=${FOUND% *}
+            VERSION=${FOUND#* }
+          fi
+          if [ -z "$VERSION" ]; then
+            echo "::error::No magento_version input and no product-community-edition in $LOCK"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "distribution=${DISTRIBUTION:-magento}" >> "$GITHUB_OUTPUT"
+
       # OWNER/REPO/PATH@REF instead of checkout + `uses: ./` - a plain checkout of this
       # step's own repo actually checks out whatever repo is CALLING this reusable workflow,
       # not the repo the workflow file itself lives in (GitHub has no context variable
@@ -77,8 +105,8 @@ jobs:
         id: compute-software-requirements
         uses: samjuk/github-actions/.github/actions/magento/compute-software-requirements@master
         with:
-          magento_version: ${{ inputs.magento_version }}
-          distribution: ${{ inputs.magento_distribution }}
+          magento_version: ${{ steps.detect.outputs.version }}
+          distribution: ${{ steps.detect.outputs.distribution }}
 
   phpunit-test:
     name: PHPUnit Test
@@ -130,10 +158,23 @@ jobs:
         with:
           fetch-depth: 0
 
+      # composer install was 66s of luma's PHPUnit job, downloading every package each run.
+      - name: Composer Cache Directory
+        id: composer-cache
+        run: echo "dir=$(composer config --global cache-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer Downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: composer-
+
       - name: Install Project and dependencies
         working-directory: ${{ inputs.project_path }}
         env:
           COMPOSER_NO_SECURITY_BLOCKING: 1
+          COMPOSER_AUTH: ${{ secrets.COMPOSER_AUTH }}
         run: |
           composer install
 
@@ -180,14 +221,6 @@ jobs:
         working-directory: ${{ inputs.project_path }}
         run: |
           vendor/bin/phpunit ${{ steps.phpunit-flags.outputs.flags }} -c dev/tests/unit/phpunit.xml.dist --testsuite Project_Unit_Tests
-
-      - name: Run DI Compile
-        working-directory: ${{ inputs.project_path }}
-        run: |
-          # A bare composer install never populates app/etc/config.php, so every
-          # module (including core ones) reads as disabled until enabled explicitly.
-          php bin/magento module:enable --all
-          php bin/magento setup:di:compile
 
       - name: Configure Integration Test Database
         if: ${{ inputs.run_integration_tests }}

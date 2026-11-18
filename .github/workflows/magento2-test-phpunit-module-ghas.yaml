@@ -33,6 +33,16 @@ on:
         required: false
         type: boolean
         default: false
+      run_phpstan:
+        description: 'Run PHPStan against module_path, with Magento installed alongside so framework classes resolve'
+        required: false
+        type: boolean
+        default: false
+      phpstan_level:
+        description: 'PHPStan analysis level'
+        required: false
+        type: string
+        default: '5'
 
       timeout_minutes:
         description: 'Per-job timeout. Raise it for a large integration suite; the default only exists to stop a hung job running to GitHub''s 360 minute ceiling.'
@@ -160,6 +170,14 @@ jobs:
           EXT_NAME=$(jq -r '.name' "${{ inputs.module_path }}/composer.json")
           composer config repositories.local path "${{ inputs.module_path }}"
           composer require -W --prefer-source "${EXT_NAME}:@dev"
+
+      # Here rather than in magento2-test-static: that job has no Magento installed, so every
+      # framework class was class.notFound and the step ended in `|| true`.
+      - name: Run PHPStan
+        if: ${{ inputs.run_phpstan }}
+        run: |
+          vendor/bin/phpstan analyse --no-progress --memory-limit=2G --error-format=github \
+            --level=${{ inputs.phpstan_level }} "${{ inputs.module_path }}"
 
       - name: Detect PHPUnit Flags
         id: phpunit-flags
