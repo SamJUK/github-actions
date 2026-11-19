@@ -1,0 +1,23 @@
+name: Test magento2-test-lint
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/magento2-test-lint.yaml
+      - .github/workflows/_internal-test-magento2-test-lint.yaml
+      - .github/fixtures/demo-package/**
+  pull_request:
+    paths:
+      - .github/workflows/magento2-test-lint.yaml
+      - .github/workflows/_internal-test-magento2-test-lint.yaml
+      - .github/fixtures/demo-package/**
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/magento2-test-lint.yaml
+    with:
+      directory: .github/fixtures/demo-package

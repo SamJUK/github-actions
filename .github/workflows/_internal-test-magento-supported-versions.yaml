@@ -15,6 +15,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   default:
     uses: ./.github/workflows/magento-supported-versions.yaml
@@ -46,18 +49,20 @@ jobs:
       - name: Assert default list
         shell: bash
         run: |
-          actual='${{ needs.default.outputs.versions }}'
+          actual="${NEEDS_DEFAULT_OUTPUTS_VERSIONS}"
           expected='[{"distribution":"magento","version":"2.4.9"},{"distribution":"magento","version":"2.4.8-p5"},{"distribution":"magento","version":"2.4.7-p10"},{"distribution":"magento","version":"2.4.6-p15"},{"distribution":"mage-os","version":"3.6.0"}]'
           if [[ "$actual" != "$expected" ]]; then
             echo "expected: $expected"
             echo "actual:   $actual"
             exit 1
           fi
+        env:
+          NEEDS_DEFAULT_OUTPUTS_VERSIONS: ${{ needs.default.outputs.versions }}
 
       - name: Assert include/exclude + glob applied
         shell: bash
         run: |
-          actual='${{ needs.include-exclude.outputs.versions }}'
+          actual="${NEEDS_INCLUDE_EXCLUDE_OUTPUTS_VERSIONS}"
           # magento:2.4.8-p5 dropped by exact (bare, version-only) exclude; base "2.4.9"
           # and the just-included "2.4.9-p1" both dropped by the "2.4.9*" glob exclude -
           # proves glob matching works against base AND included entries, not just exact
@@ -69,11 +74,13 @@ jobs:
             echo "actual:   $actual"
             exit 1
           fi
+        env:
+          NEEDS_INCLUDE_EXCLUDE_OUTPUTS_VERSIONS: ${{ needs.include-exclude.outputs.versions }}
 
       - name: Assert distribution-qualified include/exclude
         shell: bash
         run: |
-          actual='${{ needs.distribution-scoped.outputs.versions }}'
+          actual="${NEEDS_DISTRIBUTION_SCOPED_OUTPUTS_VERSIONS}"
           # "mage-os:3.6.0" exact-excluded (distribution-qualified, doesn't touch any
           # magento entry); "mage-os:2.3.0" included the same way.
           expected='[{"distribution":"magento","version":"2.4.9"},{"distribution":"magento","version":"2.4.8-p5"},{"distribution":"magento","version":"2.4.7-p10"},{"distribution":"magento","version":"2.4.6-p15"},{"distribution":"mage-os","version":"2.3.0"}]'
@@ -82,3 +89,5 @@ jobs:
             echo "actual:   $actual"
             exit 1
           fi
+        env:
+          NEEDS_DISTRIBUTION_SCOPED_OUTPUTS_VERSIONS: ${{ needs.distribution-scoped.outputs.versions }}

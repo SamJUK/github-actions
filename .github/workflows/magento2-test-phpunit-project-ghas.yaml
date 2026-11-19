@@ -43,7 +43,6 @@ on:
         required: false
         type: boolean
         default: false
-
       timeout_minutes:
         description: 'Per-job timeout. Raise it for a large integration suite; the default only exists to stop a hung job running to GitHub''s 360 minute ceiling.'
         required: false
@@ -126,9 +125,10 @@ jobs:
           composer --version
 
       - name: Checkout Project
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Install Project and dependencies
         working-directory: ${{ inputs.project_path }}
@@ -160,7 +160,7 @@ jobs:
           # entries (that would run every core module's own unit tests too).
           cat > /tmp/testsuite-unit.xml << EOF
                   <testsuite name="Project_Unit_Tests">
-                      <directory>../../../${{ inputs.test_directory }}</directory>
+                      <directory>../../../${INPUTS_TEST_DIRECTORY}</directory>
                   </testsuite>
           EOF
           sed -i '/<testsuites>/r /tmp/testsuite-unit.xml' dev/tests/unit/phpunit.xml.dist
@@ -174,12 +174,17 @@ jobs:
           # turning a clean pass into "OK, but there were issues!" (exit 1).
           # See https://github.com/magento/magento2/issues/36702
           sed -i '/<extensions>/,/<\/extensions>/d' dev/tests/unit/phpunit.xml.dist
+        env:
+          INPUTS_TEST_DIRECTORY: ${{ inputs.test_directory }}
 
       - name: Run Unit Tests
         if: ${{ inputs.run_unit_tests }}
         working-directory: ${{ inputs.project_path }}
         run: |
-          vendor/bin/phpunit ${{ steps.phpunit-flags.outputs.flags }} -c dev/tests/unit/phpunit.xml.dist --testsuite Project_Unit_Tests
+          # shellcheck disable=SC2086 # STEPS_PHPUNIT_FLAGS_OUTPUTS_FLAGS is an intentional space-separated flag list, must stay unquoted to split into args
+          vendor/bin/phpunit ${STEPS_PHPUNIT_FLAGS_OUTPUTS_FLAGS} -c dev/tests/unit/phpunit.xml.dist --testsuite Project_Unit_Tests
+        env:
+          STEPS_PHPUNIT_FLAGS_OUTPUTS_FLAGS: ${{ steps.phpunit-flags.outputs.flags }}
 
       - name: Run DI Compile
         working-directory: ${{ inputs.project_path }}
@@ -242,7 +247,7 @@ jobs:
           # the entire core integration suite alongside app/code's.
           cat > /tmp/testsuite-integration.xml << EOF
                   <testsuite name="Project_Integration_Tests">
-                      <directory>../../../${{ inputs.integration_test_directory }}</directory>
+                      <directory>../../../${INPUTS_INTEGRATION_TEST_DIRECTORY}</directory>
                   </testsuite>
           EOF
           sed -i '/<testsuites>/r /tmp/testsuite-integration.xml' dev/tests/integration/phpunit.xml.dist
@@ -251,10 +256,15 @@ jobs:
           fi
           # See https://github.com/magento/magento2/issues/36702
           sed -i '/<extensions>/,/<\/extensions>/d' dev/tests/integration/phpunit.xml.dist
+        env:
+          INPUTS_INTEGRATION_TEST_DIRECTORY: ${{ inputs.integration_test_directory }}
 
       - name: Run Integration Tests
         if: ${{ inputs.run_integration_tests }}
         working-directory: ${{ inputs.project_path }}
         run: |
           cd dev/tests/integration
-          ../../../vendor/bin/phpunit ${{ steps.phpunit-flags.outputs.flags }} -c phpunit.xml.dist --testsuite Project_Integration_Tests
+          # shellcheck disable=SC2086 # STEPS_PHPUNIT_FLAGS_OUTPUTS_FLAGS is an intentional space-separated flag list, must stay unquoted to split into args
+          ../../../vendor/bin/phpunit ${STEPS_PHPUNIT_FLAGS_OUTPUTS_FLAGS} -c phpunit.xml.dist --testsuite Project_Integration_Tests
+        env:
+          STEPS_PHPUNIT_FLAGS_OUTPUTS_FLAGS: ${{ steps.phpunit-flags.outputs.flags }}

@@ -59,21 +59,38 @@ runs:
       id: extract-software-requirements
       shell: bash
       run: |
-        jq -r --arg d ${{ inputs.distribution }} --arg v ${{ inputs.magento_version }} '.[$d][$v] | to_entries | map("\(.key)=\(.value|tostring)") | .[]' ${{ github.action_path }}/manifest.json >> "$GITHUB_OUTPUT"
+        jq -r --arg d ${INPUTS_DISTRIBUTION} --arg v ${INPUTS_MAGENTO_VERSION} '.[$d][$v] | to_entries | map("\(.key)=\(.value|tostring)") | .[]' ${{ github.action_path }}/manifest.json >> "$GITHUB_OUTPUT"
+      env:
+        INPUTS_DISTRIBUTION: ${{ inputs.distribution }}
+        INPUTS_MAGENTO_VERSION: ${{ inputs.magento_version }}
 
     - name: Debug Github Output
       shell: bash
       run: |
-        echo "composer=${{ steps.extract-software-requirements.outputs.composer }}"
-        echo "php=${{ steps.extract-software-requirements.outputs.php }}"
-        echo "mysql=${{ steps.extract-software-requirements.outputs.mysql }}"
-        echo "mariadb=${{ steps.extract-software-requirements.outputs.mariadb }}"
-        echo "elasticsearch=${{ steps.extract-software-requirements.outputs.elasticsearch }}"
-        echo "opensearch=${{ steps.extract-software-requirements.outputs.opensearch }}"
-        echo "redis=${{ steps.extract-software-requirements.outputs.redis }}"
-        echo "valkey=${{ steps.extract-software-requirements.outputs.valkey }}"
-        echo "apache=${{ steps.extract-software-requirements.outputs.apache }}"
-        echo "nginx=${{ steps.extract-software-requirements.outputs.nginx }}"
-        echo "varnish=${{ steps.extract-software-requirements.outputs.varnish }}"
-        echo "rabbitmq=${{ steps.extract-software-requirements.outputs.rabbitmq }}"
-        echo "activemq_artemis=${{ steps.extract-software-requirements.outputs.activemq_artemis }}"
+        echo "composer=${STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_COMPOSER}"
+        echo "php=${STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_PHP}"
+        echo "mysql=${STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_MYSQL}"
+        echo "mariadb=${STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_MARIADB}"
+        echo "elasticsearch=${STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_ELASTICSEARCH}"
+        echo "opensearch=${STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_OPENSEARCH}"
+        echo "redis=${STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_REDIS}"
+        echo "valkey=${STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_VALKEY}"
+        echo "apache=${STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_APACHE}"
+        echo "nginx=${STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_NGINX}"
+        echo "varnish=${STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_VARNISH}"
+        echo "rabbitmq=${STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_RABBITMQ}"
+        echo "activemq_artemis=${STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_ACTIVEMQ_ARTEMIS}"
+      env:
+        STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_COMPOSER: ${{ steps.extract-software-requirements.outputs.composer }}
+        STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_PHP: ${{ steps.extract-software-requirements.outputs.php }}
+        STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_MYSQL: ${{ steps.extract-software-requirements.outputs.mysql }}
+        STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_MARIADB: ${{ steps.extract-software-requirements.outputs.mariadb }}
+        STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_ELASTICSEARCH: ${{ steps.extract-software-requirements.outputs.elasticsearch }}
+        STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_OPENSEARCH: ${{ steps.extract-software-requirements.outputs.opensearch }}
+        STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_REDIS: ${{ steps.extract-software-requirements.outputs.redis }}
+        STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_VALKEY: ${{ steps.extract-software-requirements.outputs.valkey }}
+        STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_APACHE: ${{ steps.extract-software-requirements.outputs.apache }}
+        STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_NGINX: ${{ steps.extract-software-requirements.outputs.nginx }}
+        STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_VARNISH: ${{ steps.extract-software-requirements.outputs.varnish }}
+        STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_RABBITMQ: ${{ steps.extract-software-requirements.outputs.rabbitmq }}
+        STEPS_EXTRACT_SOFTWARE_REQUIREMENTS_OUTPUTS_ACTIVEMQ_ARTEMIS: ${{ steps.extract-software-requirements.outputs.activemq_artemis }}

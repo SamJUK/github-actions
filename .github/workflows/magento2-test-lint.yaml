@@ -18,7 +18,6 @@ on:
         type: string
         default: "."
         description: "Directory to lint"
-
       timeout_minutes:
         description: 'Per-job timeout. Raise it for a large integration suite; the default only exists to stop a hung job running to GitHub''s 360 minute ceiling.'
         required: false
@@ -31,73 +30,88 @@ jobs:
     timeout-minutes: ${{ inputs.timeout_minutes }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           sparse-checkout: |
-            composer.json
-            composer.lock
+            ${{ inputs.directory }}/composer.json
+            ${{ inputs.directory }}/composer.lock
+          persist-credentials: false
 
       - name: Set PHP & Composer Version
-        uses: shivammathur/setup-php@8358ee0e2e8afe63c2fb8253d1d52085811ab1e5 # v2
+        uses: shivammathur/setup-php@9a96576163ad88ed6f6f2cbf381c5229baf95677 # v2
         with:
           php-version: ${{ inputs.php_version }}
           tools: composer:${{ inputs.composer_version }}
 
       - name: Validating Composer
-        run: composer validate --no-check-publish
+        run: composer validate --no-check-publish --working-dir="${INPUTS_DIRECTORY}"
+        env:
+          INPUTS_DIRECTORY: ${{ inputs.directory }}
 
   php:
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout_minutes }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set PHP Version
-        uses: shivammathur/setup-php@8358ee0e2e8afe63c2fb8253d1d52085811ab1e5 # v2
+        uses: shivammathur/setup-php@9a96576163ad88ed6f6f2cbf381c5229baf95677 # v2
         with:
           php-version: ${{ inputs.php_version }}
 
       - name: Lint PHP Files
         run: |
           set +e
-          find ${{ inputs.directory }} -type f -name '*.php' -exec php -l {} 2>&1 \; | grep -v "^No syntax errors detected"
+          find "${INPUTS_DIRECTORY}" -type f -name '*.php' -exec php -l {} \; 2>&1 | grep -v "^No syntax errors detected"
           test $? -eq 0 && exit 1 || exit 0
+        env:
+          INPUTS_DIRECTORY: ${{ inputs.directory }}
 
   yaml:
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout_minutes }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
+      - name: Install Tooling
+        # Usually on the runner image already; install only when missing, from a fresh index.
+        run: command -v yamllint || { sudo apt-get update -qq && sudo apt-get install -y yamllint; }
+
+      # yamllint's default config fails on lines over 80 characters. Fall back to its relaxed
+      # preset, which still fails on broken YAML, unless the repository brings its own config.
       - name: Lint YAML Files
         run: |
-          exit 0 # TODO
-          # set +e
-          # find ${{ inputs.directory }} -type f \( -name '*.yml' -o -name '*.yaml' \) -exec yamllint {} \; 
-          # test $? -eq 0 && exit 1 || exit 0
+          config=(-d relaxed)
+          for f in .yamllint .yamllint.yaml .yamllint.yml; do [ -f "$f" ] && config=(); done
+          find "${INPUTS_DIRECTORY}" -type f \( -name '*.yml' -o -name '*.yaml' \) -exec yamllint "${config[@]}" {} \+
+        env:
+          INPUTS_DIRECTORY: ${{ inputs.directory }}
 
   xml:
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout_minutes }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
-      # - name: Install Tooling
-      #   run: sudo apt-get install libxml2-utils -y
+      - name: Install Tooling
+        # Usually on the runner image already; install only when missing, from a fresh index.
+        run: command -v xmllint || { sudo apt-get update -qq && sudo apt-get install -y libxml2-utils; }
 
       - name: Lint XML Files
         run: |
-          exit 0 # TODO
-          # set +e
-          # find ${{ inputs.directory }} -type f -name '*.xml' -exec xmllint --noout {} \; 
-          # test $? -eq 0 && exit 1 || exit 0
+          find "${INPUTS_DIRECTORY}" -type f -name '*.xml' -exec xmllint --noout {} \+
+        env:
+          INPUTS_DIRECTORY: ${{ inputs.directory }}

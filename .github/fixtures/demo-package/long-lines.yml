@@ -1,0 +1,2 @@
+# Over 80 characters on purpose: yamllint default config would fail this line, relaxed does not.
+name: demo-package

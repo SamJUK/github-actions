@@ -33,7 +33,6 @@ on:
         required: false
         type: boolean
         default: false
-
       timeout_minutes:
         description: 'Per-job timeout. Raise it for a large integration suite; the default only exists to stop a hung job running to GitHub''s 360 minute ceiling.'
         required: false
@@ -127,18 +126,19 @@ jobs:
           composer --version
 
       - name: Checkout Local Actions
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           path: ./extensions/${{ github.event.repository.name }}
+          persist-credentials: false
 
       - name: Check Test Directories
         id: test-dirs
         run: |
           UNIT_EXISTS=false
-          [ -d "${{ inputs.module_path }}/Test/Unit" ] && UNIT_EXISTS=true
+          [ -d "${INPUTS_MODULE_PATH}/Test/Unit" ] && UNIT_EXISTS=true
           INTEGRATION_EXISTS=false
-          [ -d "${{ inputs.module_path }}/Test/Integration" ] && INTEGRATION_EXISTS=true
+          [ -d "${INPUTS_MODULE_PATH}/Test/Integration" ] && INTEGRATION_EXISTS=true
           echo "unit_exists=${UNIT_EXISTS}" >> "$GITHUB_OUTPUT"
           echo "integration_exists=${INTEGRATION_EXISTS}" >> "$GITHUB_OUTPUT"
 
@@ -149,16 +149,19 @@ jobs:
 
           if { [ "${{ inputs.run_unit_tests }}" = "true" ] || [ "${{ inputs.run_integration_tests }}" = "true" ]; } \
              && [ "$UNIT_WILL_RUN" = "false" ] && [ "$INTEGRATION_WILL_RUN" = "false" ]; then
-            echo "::error::Tests were requested (run_unit_tests/run_integration_tests) but neither Test/Unit nor Test/Integration exists at ${{ inputs.module_path }}."
+            echo "::error::Tests were requested (run_unit_tests/run_integration_tests) but neither Test/Unit nor Test/Integration exists at ${INPUTS_MODULE_PATH}."
             exit 1
           fi
+        env:
+          INPUTS_MODULE_PATH: ${{ inputs.module_path }}
 
       - name: Install Module via Composer
         env:
           COMPOSER_NO_SECURITY_BLOCKING: 1
+          INPUTS_MODULE_PATH: ${{ inputs.module_path }}
         run: |
-          EXT_NAME=$(jq -r '.name' "${{ inputs.module_path }}/composer.json")
-          composer config repositories.local path "${{ inputs.module_path }}"
+          EXT_NAME=$(jq -r '.name' "${INPUTS_MODULE_PATH}/composer.json")
+          composer config repositories.local path "${INPUTS_MODULE_PATH}"
           composer require -W --prefer-source "${EXT_NAME}:@dev"
 
       - name: Detect PHPUnit Flags
@@ -175,7 +178,11 @@ jobs:
       - name: Run Unit Tests
         if: ${{ inputs.run_unit_tests && steps.test-dirs.outputs.unit_exists == 'true' }}
         run: |
-          vendor/bin/phpunit ${{ steps.phpunit-flags.outputs.flags }} "${{ inputs.module_path }}/Test/Unit"
+          # shellcheck disable=SC2086 # STEPS_PHPUNIT_FLAGS_OUTPUTS_FLAGS is an intentional space-separated flag list, must stay unquoted to split into args
+          vendor/bin/phpunit ${STEPS_PHPUNIT_FLAGS_OUTPUTS_FLAGS} "${INPUTS_MODULE_PATH}/Test/Unit"
+        env:
+          STEPS_PHPUNIT_FLAGS_OUTPUTS_FLAGS: ${{ steps.phpunit-flags.outputs.flags }}
+          INPUTS_MODULE_PATH: ${{ inputs.module_path }}
 
       # composer require alone leaves the module disabled, so the compile would skip its di.xml.
       - name: Run DI Compile
@@ -232,4 +239,8 @@ jobs:
         if: ${{ inputs.run_integration_tests && steps.test-dirs.outputs.integration_exists == 'true' }}
         run: |
           cd dev/tests/integration
-          ../../../vendor/bin/phpunit ${{ steps.phpunit-flags.outputs.flags }} "../../../${{ inputs.module_path }}/Test/Integration"
+          # shellcheck disable=SC2086 # STEPS_PHPUNIT_FLAGS_OUTPUTS_FLAGS is an intentional space-separated flag list, must stay unquoted to split into args
+          ../../../vendor/bin/phpunit ${STEPS_PHPUNIT_FLAGS_OUTPUTS_FLAGS} "../../../${INPUTS_MODULE_PATH}/Test/Integration"
+        env:
+          STEPS_PHPUNIT_FLAGS_OUTPUTS_FLAGS: ${{ steps.phpunit-flags.outputs.flags }}
+          INPUTS_MODULE_PATH: ${{ inputs.module_path }}
