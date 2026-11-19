@@ -10,6 +10,8 @@ Unlike the module variant, a project pins its own exact Magento version via its 
 
 `magento_distribution` (default `magento`) switches to `mage-os` for a Mage-OS project - swaps the `compute-software-requirements` lookup to the `mage-os` manifest key. Unlike the module variant there's no container image to swap (this workflow's container is a distribution-agnostic PHP runtime, not a pre-built Magento install), so this only affects the computed PHP/service versions. `php_version` overrides the computed PHP version, same as the module variant.
 
+`warden_env_file` (e.g. `./.env`) takes the PHP, database and OpenSearch versions from the project's Warden `.env` instead, read by [warden/versions](../actions/warden/versions/README.md), so a Warden project keeps one service list. The database service follows the `.env`'s `MYSQL_DISTRIBUTION`, so MariaDB projects test on MariaDB. Anything the `.env` leaves off falls back to `magento_version`, and `php_version` still wins over both.
+
 2.4.4 and earlier aren't supported for `run_integration_tests` - those versions default to `search-engine: elasticsearch7`/`elasticsearch-host` instead of `opensearch-host`, which this workflow doesn't account for, so search installation fails.
 
 ## Usage
