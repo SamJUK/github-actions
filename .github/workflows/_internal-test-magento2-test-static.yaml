@@ -1,0 +1,30 @@
+name: Test magento2-test-static
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/magento2-test-static.yaml
+      - .github/workflows/_internal-test-magento2-test-static.yaml
+      - .github/fixtures/demo-package/**
+      - .github/fixtures/demo-package-phpstan-magento/**
+  pull_request:
+    paths:
+      - .github/workflows/magento2-test-static.yaml
+      - .github/workflows/_internal-test-magento2-test-static.yaml
+      - .github/fixtures/demo-package/**
+      - .github/fixtures/demo-package-phpstan-magento/**
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/magento2-test-static.yaml
+    with:
+      directory: .github/fixtures/demo-package
+
+  test-module-phpstan-magento:
+    uses: ./.github/workflows/magento2-test-static.yaml
+    with:
+      directory: .github/fixtures/demo-package-phpstan-magento

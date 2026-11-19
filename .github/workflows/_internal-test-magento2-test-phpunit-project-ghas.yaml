@@ -19,6 +19,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   test-unit-tests:
     uses: ./.github/workflows/magento2-test-phpunit-project-ghas.yaml
@@ -33,3 +36,21 @@ jobs:
       project_path: ./.github/fixtures/demo-project
       integration_test_directory: dev/tests/integration/testsuite/SamJUK/DemoProject
       run_integration_tests: true
+
+  # No test_directory override - proves the default glob (app/code/*/*/Test/Unit)
+  # actually resolves against a real module-shaped fixture path, not just the
+  # explicit-override path every other job here uses.
+  test-default-glob:
+    uses: ./.github/workflows/magento2-test-phpunit-project-ghas.yaml
+    with:
+      project_path: ./.github/fixtures/demo-project
+      run_unit_tests: true
+
+  # No mage-os-compat / php-version-override scenarios here (unlike
+  # phpunit-module-ghas): those inputs only pick infra (container/services) - this
+  # workflow does a full `composer install` from the fixture's own composer.lock,
+  # which is what actually determines the installed distribution/PHP floor. Feeding
+  # a mismatched distribution or an incompatible PHP version just fails composer
+  # install correctly; it doesn't exercise anything this workflow owns. Proving
+  # those inputs would need a second, differently-pinned fixture, not worth it for
+  # inputs that are pass-through to compute-software-requirements.

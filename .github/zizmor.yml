@@ -1,0 +1,4 @@
+rules:
+  # Self-tests call the workflow under test with ./ on purpose: same commit, and actionlint understands it.
+  self-repository:
+    disable: true
