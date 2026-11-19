@@ -1,0 +1,94 @@
+name: Test warden/versions
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - .github/actions/warden/versions/**
+      - .github/fixtures/warden-env/**
+      - .github/workflows/_internal-test-warden-versions.yaml
+  pull_request:
+    paths:
+      - .github/actions/warden/versions/**
+      - .github/fixtures/warden-env/**
+      - .github/workflows/_internal-test-warden-versions.yaml
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (${{ matrix.fixture }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Warden 0.16.1's own magento2 template, as `warden env-init` writes it.
+          - fixture: magento2
+            expected: php=8.4 composer=2 node=20 db_distribution=mariadb mariadb=11.4 mysql= opensearch=3.3 elasticsearch= redis=7.2 valkey= nginx=1.16 varnish=7.7 rabbitmq=4.1
+          # Nothing but the type: every service falls back to Warden's defaults.
+          - fixture: minimal
+            expected: php=7.4 composer= node= db_distribution=mariadb mariadb=10.6 mysql= opensearch= elasticsearch=8.11 redis=5.0 valkey= nginx=1.16 varnish=6.0 rabbitmq=3.8
+          # CRLF line endings, a quoted value, a repeated key and services switched off.
+          - fixture: mysql-valkey
+            expected: php=8.4 composer=2.8 node= db_distribution=mysql mariadb= mysql=8.4 opensearch=2.19 elasticsearch= redis= valkey=8.1 nginx=1.16 varnish= rabbitmq=
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - id: versions
+        uses: ./.github/actions/warden/versions
+        with:
+          env_file: .github/fixtures/warden-env/${{ matrix.fixture }}.env
+
+      - name: Assert outputs
+        shell: bash
+        env:
+          EXPECTED: ${{ matrix.expected }}
+          ACTUAL: >-
+            php=${{ steps.versions.outputs.php }}
+            composer=${{ steps.versions.outputs.composer }}
+            node=${{ steps.versions.outputs.node }}
+            db_distribution=${{ steps.versions.outputs.db_distribution }}
+            mariadb=${{ steps.versions.outputs.mariadb }}
+            mysql=${{ steps.versions.outputs.mysql }}
+            opensearch=${{ steps.versions.outputs.opensearch }}
+            elasticsearch=${{ steps.versions.outputs.elasticsearch }}
+            redis=${{ steps.versions.outputs.redis }}
+            valkey=${{ steps.versions.outputs.valkey }}
+            nginx=${{ steps.versions.outputs.nginx }}
+            varnish=${{ steps.versions.outputs.varnish }}
+            rabbitmq=${{ steps.versions.outputs.rabbitmq }}
+        run: |
+          if [[ "$ACTUAL" != "$EXPECTED" ]]; then
+            echo "expected: $EXPECTED"
+            echo "actual:   $ACTUAL"
+            exit 1
+          fi
+
+  missing-file:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - id: versions
+        uses: ./.github/actions/warden/versions
+        continue-on-error: true
+        with:
+          env_file: .github/fixtures/warden-env/does-not-exist.env
+
+      - name: Assert it failed
+        shell: bash
+        env:
+          OUTCOME: ${{ steps.versions.outcome }}
+        run: '[[ "$OUTCOME" == failure ]] || { echo "expected failure, got $OUTCOME"; exit 1; }'

@@ -6,8 +6,7 @@ This repository contains production ready, reusable Github actions and workflows
 | Action                                                                                                     | Description                                                                |
 | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | [magento/compute-software-requirements](./.github/actions/magento/compute-software-requirements/README.md) | Takes a Magento version input, an computes the  required software versions |
-| [warden/create-env](./.github/actions/warden/create-env/README.md)                                         | Handles generating a complete warden `.env` file from inputs with defaults |
-| [warden/setup-environment](./.github/actions/warden/setup-environment/README.md)                           | Handles setting up, and starting a warden environment in Github Actions |
+| [warden/versions](./.github/actions/warden/versions/README.md) | Reads a Warden `.env` and outputs its service versions, keyed like magento/compute-software-requirements |
 
 
 ## Workflows
@@ -20,5 +19,3 @@ This repository contains production ready, reusable Github actions and workflows
 | [magento2-test-phpunit-module-ghas](./.github/workflows/magento2-test-phpunit-module-ghas.readme.md) | PHPUnit tests for a Magento module (unit + DI compile + integration), using GitHub Actions Services
 | [magento2-test-dependencies-module](./.github/workflows/magento2-test-dependencies-module.readme.md) | Checks a Magento module declares its dependencies in composer.json and module.xml (Yireo ExtensionChecker)
 | [magento2-test-phpunit-project-ghas](./.github/workflows/magento2-test-phpunit-project-ghas.readme.md) | PHPUnit tests for a Magento project (unit + DI compile + integration), using GitHub Actions Services
-| [magento2-test-unit-module-warden](./.github/workflows/magento2-test-unit-module-warden.readme.md) | Handles running Unit tests against a Magento module using Warden
-| [magento2-test-unit-project-warden](./.github/workflows/magento2-test-unit-project-warden.readme.md) | Handles running Unit tests against a Magento project using Warden
