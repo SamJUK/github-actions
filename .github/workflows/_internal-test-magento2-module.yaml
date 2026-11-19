@@ -1,0 +1,47 @@
+name: Test magento2-module
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/magento2-module.yaml
+      - .github/workflows/_internal-test-magento2-module.yaml
+      - .github/fixtures/demo-package/**
+      - .github/fixtures/demo-package-no-tests/**
+  pull_request:
+    paths:
+      - .github/workflows/magento2-module.yaml
+      - .github/workflows/_internal-test-magento2-module.yaml
+      - .github/fixtures/demo-package/**
+      - .github/fixtures/demo-package-no-tests/**
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # The wiring only: each workflow it calls has its own self-test, so one version is enough here.
+  test:
+    uses: ./.github/workflows/magento2-module.yaml
+    with:
+      directory: .github/fixtures/demo-package
+      exclude: |
+        2.4.6*
+        2.4.7*
+        2.4.8*
+        mage-os:*
+
+  test-no-tests:
+    uses: ./.github/workflows/magento2-module.yaml
+    with:
+      directory: .github/fixtures/demo-package-no-tests
+      run_unit_tests: false
+      run_integration_tests: false
+      exclude: |
+        2.4.6*
+        2.4.7*
+        2.4.8*
+        mage-os:*
