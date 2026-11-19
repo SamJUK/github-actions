@@ -1,0 +1,70 @@
+name: Magento 2 Module CI
+
+on:
+  workflow_call:
+    inputs:
+      directory:
+        description: 'Module directory, relative to the repository root'
+        required: false
+        type: string
+        default: '.'
+      exclude:
+        description: 'Magento versions (or glob patterns, e.g. "2.4.6*") to skip in the PHPUnit matrix, one per line'
+        required: false
+        type: string
+        default: ''
+      run_unit_tests:
+        description: 'Run Test/Unit. Turn off for a module with no unit tests'
+        required: false
+        type: boolean
+        default: true
+      run_integration_tests:
+        description: 'Run Test/Integration. Turn off for a module with no integration tests'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Linter
+    uses: samjuk/github-actions/.github/workflows/magento2-test-lint.yaml@master
+    with:
+      directory: ${{ inputs.directory }}
+
+  static:
+    name: Static Analysis
+    needs: lint
+    uses: samjuk/github-actions/.github/workflows/magento2-test-static.yaml@master
+    with:
+      directory: ${{ inputs.directory }}
+
+  dependencies:
+    name: Dependencies
+    needs: lint
+    uses: samjuk/github-actions/.github/workflows/magento2-test-dependencies-module.yaml@master
+    with:
+      module_path: ./extensions/${{ github.event.repository.name }}/${{ inputs.directory }}
+
+  supported-versions:
+    name: Supported Versions
+    uses: samjuk/github-actions/.github/workflows/magento-supported-versions.yaml@master
+    with:
+      exclude: ${{ inputs.exclude }}
+
+  phpunit:
+    name: PHPUnit Tests (GHAS)
+    needs: [static, dependencies, supported-versions]
+    uses: samjuk/github-actions/.github/workflows/magento2-test-phpunit-module-ghas.yaml@master
+    with:
+      module_path: ./extensions/${{ github.event.repository.name }}/${{ inputs.directory }}
+      magento_version: ${{ matrix.version }}
+      magento_distribution: ${{ matrix.distribution }}
+      run_unit_tests: ${{ inputs.run_unit_tests }}
+      run_integration_tests: ${{ inputs.run_integration_tests }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.supported-versions.outputs.versions) }}
