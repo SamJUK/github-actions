@@ -6,6 +6,7 @@ This repository contains production ready, reusable Github actions and workflows
 | Action                                                                                                     | Description                                                                |
 | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | [magento/compute-software-requirements](./.github/actions/magento/compute-software-requirements/README.md) | Takes a Magento version input, an computes the  required software versions |
+| [warden/versions](./.github/actions/warden/versions/README.md) | Reads a Warden `.env` and outputs its service versions, keyed like magento/compute-software-requirements |
 
 
 ## Workflows

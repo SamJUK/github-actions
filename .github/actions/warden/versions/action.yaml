@@ -1,0 +1,60 @@
+name: "Warden Environment Versions"
+author: "SamJUK"
+description: "Reads a Warden .env file and outputs the service versions it runs, keyed like magento/compute-software-requirements"
+
+inputs:
+  env_file:
+    description: "Path to the Warden .env file"
+    required: false
+    default: ".env"
+
+outputs:
+  composer:
+    description: "Composer version"
+    value: ${{ steps.versions.outputs.composer }}
+  php:
+    description: "PHP version"
+    value: ${{ steps.versions.outputs.php }}
+  node:
+    description: "Node.js version"
+    value: ${{ steps.versions.outputs.node }}
+  db_distribution:
+    description: "mariadb or mysql, empty when the database is off"
+    value: ${{ steps.versions.outputs.db_distribution }}
+  mysql:
+    description: "MySQL version, empty unless the distribution is mysql"
+    value: ${{ steps.versions.outputs.mysql }}
+  mariadb:
+    description: "MariaDB version, empty unless the distribution is mariadb"
+    value: ${{ steps.versions.outputs.mariadb }}
+  elasticsearch:
+    description: "Elasticsearch version, empty when off"
+    value: ${{ steps.versions.outputs.elasticsearch }}
+  opensearch:
+    description: "OpenSearch version, empty when off"
+    value: ${{ steps.versions.outputs.opensearch }}
+  redis:
+    description: "Redis version, empty when off"
+    value: ${{ steps.versions.outputs.redis }}
+  valkey:
+    description: "Valkey version, empty when off"
+    value: ${{ steps.versions.outputs.valkey }}
+  nginx:
+    description: "Nginx version, empty when off"
+    value: ${{ steps.versions.outputs.nginx }}
+  varnish:
+    description: "Varnish version, empty when off"
+    value: ${{ steps.versions.outputs.varnish }}
+  rabbitmq:
+    description: "RabbitMQ version, empty when off"
+    value: ${{ steps.versions.outputs.rabbitmq }}
+
+runs:
+  using: composite
+  steps:
+    - name: Read Warden Versions
+      id: versions
+      shell: bash
+      env:
+        ENV_FILE: ${{ inputs.env_file }}
+      run: bash "${GITHUB_ACTION_PATH}/versions.sh" "$ENV_FILE" | tee -a "$GITHUB_OUTPUT"
