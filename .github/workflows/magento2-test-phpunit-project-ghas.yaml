@@ -43,6 +43,11 @@ on:
         required: false
         type: boolean
         default: false
+      warden_env_file:
+        description: 'Path to a Warden .env (e.g. ./.env) to take PHP, database and OpenSearch versions from instead of magento_version. Anything the .env leaves off falls back to magento_version.'
+        required: false
+        type: string
+        default: ''
       timeout_minutes:
         description: 'Per-job timeout. Raise it for a large integration suite; the default only exists to stop a hung job running to GitHub''s 360 minute ceiling.'
         required: false
@@ -55,11 +60,12 @@ jobs:
     timeout-minutes: ${{ inputs.timeout_minutes }}
     outputs:
       composer: ${{ steps.compute-software-requirements.outputs.composer }}
-      php: ${{ steps.compute-software-requirements.outputs.php }}
-      mysql: ${{ steps.compute-software-requirements.outputs.mysql }}
+      php: ${{ steps.warden.outputs.php || steps.compute-software-requirements.outputs.php }}
+      db_distribution: ${{ steps.warden.outputs.db_distribution || 'mysql' }}
+      db_version: ${{ steps.warden.outputs.db_distribution && (steps.warden.outputs.mariadb || steps.warden.outputs.mysql) || steps.compute-software-requirements.outputs.mysql }}
       mariadb: ${{ steps.compute-software-requirements.outputs.mariadb }}
       elasticsearch: ${{ steps.compute-software-requirements.outputs.elasticsearch }}
-      opensearch: ${{ steps.compute-software-requirements.outputs.opensearch }}
+      opensearch: ${{ steps.warden.outputs.opensearch || steps.compute-software-requirements.outputs.opensearch }}
       redis: ${{ steps.compute-software-requirements.outputs.redis }}
       valkey: ${{ steps.compute-software-requirements.outputs.valkey }}
       apache: ${{ steps.compute-software-requirements.outputs.apache }}
@@ -79,6 +85,19 @@ jobs:
           magento_version: ${{ inputs.magento_version }}
           distribution: ${{ inputs.magento_distribution }}
 
+      - name: Checkout Warden .env
+        if: ${{ inputs.warden_env_file != '' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Read Warden Versions
+        id: warden
+        if: ${{ inputs.warden_env_file != '' }}
+        uses: samjuk/github-actions/.github/actions/warden/versions@master
+        with:
+          env_file: ${{ inputs.warden_env_file }}
+
   phpunit-test:
     name: PHPUnit Test
     runs-on: ubuntu-latest
@@ -92,13 +111,13 @@ jobs:
         -v "${{github.workspace}}":"${{github.workspace}}"
     services:
       mysql:
-        image: mysql:${{ needs.compute-software-requirements.outputs.mysql }}
+        image: ${{ needs.compute-software-requirements.outputs.db_distribution }}:${{ needs.compute-software-requirements.outputs.db_version }} # zizmor: ignore[unpinned-images] mysql or mariadb from the .env, tagged by version like the other services
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: magento
         ports:
           - 3306:3306
-        options: --tmpfs /tmp:rw --tmpfs /var/lib/mysql:rw --health-cmd="mysqladmin ping --silent" --health-interval=10s --health-timeout=5s --health-retries=3
+        options: --tmpfs /tmp:rw --tmpfs /var/lib/mysql:rw --health-cmd="mysqladmin ping --silent || mariadb-admin ping --silent" --health-interval=10s --health-timeout=5s --health-retries=3
       redis:
         image: redis:${{ needs.compute-software-requirements.outputs.redis }}
         ports:
