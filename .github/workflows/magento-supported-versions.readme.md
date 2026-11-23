@@ -1,20 +1,12 @@
 # Magento Supported Versions
 
-Single source of truth for which Magento/Mage-OS versions we currently
-support. Returns a JSON array of `{distribution, version}` objects
-(`versions` output) for use in a test matrix, so each module doesn't have
-to maintain its own copy of the supported-version list.
+The Magento and Mage-OS versions our modules are tested against, as a test matrix (`versions`: `[{distribution, version}]`).
+It's our list, not Adobe's, so it can keep a version Adobe has dropped.
 
-Update the `BASE_ENTRIES` list in `magento-supported-versions.yaml` when
-support changes org-wide (new release, EOL) — every consumer picks it up
-automatically on their next run.
-
-Some modules diverge from the standard list (extended support for an old
-version, or frozen on old versions because they're EOL themselves) — use
-`include`/`exclude` to adjust per-consumer without forking the list.
-Entries are `distribution:version` (bare version implies `magento`).
-`exclude` also accepts a bare glob (e.g. `2.4.9*`) matched against the
-version part only, regardless of distribution.
+- **The list:** [`versions.json`](../actions/magento/supported-versions/versions.json). Each version needs a [compute-software-requirements](../actions/magento/compute-software-requirements/README.md) entry; the self-test checks.
+- **Updates:** `_update-magento-versions.yaml` opens a PR on Mondays, or when run by hand. It syncs the requirements from [magento-compatability](https://github.com/SamJUK/magento-compatability) and moves each version to its newest patch that has a CI image. New release lines are logged, not added.
+- **Per module:** `include` adds `distribution:version` (a bare version means `magento`). `exclude` also takes a version glob, e.g. `2.4.9*`.
+- **2.4.4** is left out: it defaults to Elasticsearch 7, which the integration test config doesn't handle.
 
 ## Usage
 

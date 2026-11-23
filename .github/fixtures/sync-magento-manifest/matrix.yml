@@ -1,0 +1,62 @@
+products:
+  - name: magento
+    versions:
+      # New patch, so it's added from 2.4.9.
+      - version: "2.4.9-p1"
+        baseline:
+          php: "8.5"
+          webserver: nginx
+          db: { type: mariadb, version: "12.3" }
+          search: { type: opensearch, version: "3" }
+          cache: { type: valkey, version: "9" }
+          queue: { type: rabbitmq, version: "4.3" }
+          varnish: "8.0"
+      # OpenSearch 3 is tagged 3.0. There's no Valkey 9 image.
+      - version: "2.4.9"
+        baseline:
+          php: "8.5"
+          webserver: nginx
+          db: { type: mariadb, version: "12.3" }
+          search: { type: opensearch, version: "3" }
+          cache: { type: valkey, version: "9" }
+          queue: { type: rabbitmq, version: "4.3" }
+          varnish: "8.0"
+      # No db or cache block: php still updates, database and cache stay unset.
+      - version: "2.4.8-p5"
+        baseline:
+          php: "8.3"
+          webserver: nginx
+          search: { type: opensearch, version: "3" }
+          queue: { type: rabbitmq, version: "4.1" }
+          varnish: "7.7"
+      # Older than 2.4.8-p5, so it isn't added.
+      - version: "2.4.8-p4"
+        baseline:
+          php: "8.4"
+          webserver: nginx
+          db: { type: mariadb, version: "11.4" }
+          search: { type: opensearch, version: "3" }
+          cache: { type: valkey, version: "8" }
+          queue: { type: rabbitmq, version: "4.1" }
+          varnish: "7.7"
+  - name: mageos
+    versions:
+      # New line, so it isn't added.
+      - version: "4.0.0"
+        baseline:
+          php: "8.5"
+          webserver: nginx
+          db: { type: mariadb, version: "12.3" }
+          search: { type: opensearch, version: "3" }
+          cache: { type: valkey, version: "8" }
+          queue: { type: rabbitmq, version: "4.3" }
+          varnish: "8.0"
+      - version: "3.6.0"
+        baseline:
+          php: "8.5"
+          webserver: nginx
+          db: { type: mariadb, version: "11.4" }
+          search: { type: opensearch, version: "3" }
+          cache: { type: valkey, version: "8" }
+          queue: { type: rabbitmq, version: "4.1" }
+          varnish: "7.7"

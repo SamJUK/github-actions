@@ -1,5 +1,6 @@
 name: Test magento2-test-phpunit-module-ghas
 
+# .github/fixtures/demo-package-no-tests (no Test/ at all) only warns now, so the magento2-module self-test runs it.
 on:
   push:
     branches: [master]
@@ -18,8 +19,7 @@ on:
       - .github/actions/php/lint/**
       - .github/fixtures/demo-package/**
       - .github/fixtures/demo-package-unit-only/**
-
-# .github/fixtures/demo-package-no-tests (no Test/ at all) only warns now, so the magento2-module self-test runs it.
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -29,6 +29,23 @@ permissions:
   contents: read
 
 jobs:
+  supported-versions:
+    uses: ./.github/workflows/magento-supported-versions.yaml
+
+  # Every supported version against the services its manifest entry names.
+  test-supported-versions:
+    needs: supported-versions
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.supported-versions.outputs.versions) }}
+    uses: ./.github/workflows/magento2-test-phpunit-module-ghas.yaml
+    with:
+      module_path: ./extensions/${{ github.event.repository.name }}/.github/fixtures/demo-package
+      magento_version: ${{ matrix.version }}
+      magento_distribution: ${{ matrix.distribution }}
+      run_integration_tests: true
+
   test-unit-tests:
     uses: ./.github/workflows/magento2-test-phpunit-module-ghas.yaml
     with:

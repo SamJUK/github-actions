@@ -1,0 +1,86 @@
+name: Update Magento Versions
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  update:
+    # Scheduled in prod only; dispatch by hand to try it here.
+    if: github.event_name == 'workflow_dispatch' || github.repository == 'SamJUK/github-actions'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+    env:
+      BRANCH: chore/update-magento-versions
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check for an open PR
+        id: open
+        shell: bash
+        run: |
+          pr=$(gh pr list --head "$BRANCH" --state open --json url -q '.[0].url')
+          if [[ -n $pr ]]; then
+            echo "::notice::$pr is still open"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Sync first, so the bump sees a new patch's manifest entry.
+      - name: Sync software requirements
+        if: steps.open.outputs.skip != 'true'
+        shell: bash
+        run: CHANGES_FILE="$RUNNER_TEMP/requirements.md" .github/scripts/sync-magento-manifest.sh
+
+      - name: Bump patch versions
+        if: steps.open.outputs.skip != 'true'
+        shell: bash
+        run: CHANGES_FILE="$RUNNER_TEMP/versions.md" .github/scripts/bump-magento-versions.sh
+
+      - name: Open PR
+        if: steps.open.outputs.skip != 'true'
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "Nothing to update"
+            exit 0
+          fi
+
+          {
+            if [[ -s $RUNNER_TEMP/versions.md ]]; then
+              echo '## Supported versions'
+              cat "$RUNNER_TEMP/versions.md"
+              echo
+            fi
+            if [[ -s $RUNNER_TEMP/requirements.md ]]; then
+              echo '## Software requirements'
+              echo 'From the magento-compatability baselines.'
+              echo
+              cat "$RUNNER_TEMP/requirements.md"
+            fi
+          } > "$RUNNER_TEMP/body.md"
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$BRANCH"
+          git commit -qa -m 'chore: update supported Magento versions' -m "$(cat "$RUNNER_TEMP/body.md")"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$BRANCH"
+          gh pr create --base master --head "$BRANCH" \
+            --title 'chore: update supported Magento versions' --body-file "$RUNNER_TEMP/body.md"
+
+          # PRs opened with GITHUB_TOKEN don't trigger pull_request workflows, so dispatch the tests.
+          gh workflow run _internal-test-magento-supported-versions.yaml --ref "$BRANCH"
+          gh workflow run _internal-test-magento2-test-phpunit-module-ghas.yaml --ref "$BRANCH"

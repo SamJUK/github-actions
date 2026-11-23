@@ -44,7 +44,7 @@ on:
         type: boolean
         default: false
       warden_env_file:
-        description: 'Path to a Warden .env (e.g. ./.env) to take PHP, database and OpenSearch versions from instead of magento_version. Anything the .env leaves off falls back to magento_version.'
+        description: 'Path to a Warden .env (e.g. ./.env) to take PHP, database, cache and OpenSearch versions from instead of magento_version. Anything the .env leaves off falls back to magento_version.'
         required: false
         type: string
         default: ''
@@ -61,8 +61,8 @@ jobs:
     outputs:
       composer: ${{ steps.compute-software-requirements.outputs.composer }}
       php: ${{ steps.warden.outputs.php || steps.compute-software-requirements.outputs.php }}
-      db_distribution: ${{ steps.warden.outputs.db_distribution || 'mysql' }}
-      db_version: ${{ steps.warden.outputs.db_distribution && (steps.warden.outputs.mariadb || steps.warden.outputs.mysql) || steps.compute-software-requirements.outputs.mysql }}
+      database_image: ${{ steps.warden.outputs.db_distribution && format('{0}:{1}', steps.warden.outputs.db_distribution, steps.warden.outputs.mariadb || steps.warden.outputs.mysql) || steps.compute-software-requirements.outputs.database_image }}
+      cache_image: ${{ steps.warden.outputs.valkey && format('valkey/valkey:{0}', steps.warden.outputs.valkey) || steps.warden.outputs.redis && format('redis:{0}', steps.warden.outputs.redis) || steps.compute-software-requirements.outputs.cache_image }}
       mariadb: ${{ steps.compute-software-requirements.outputs.mariadb }}
       elasticsearch: ${{ steps.compute-software-requirements.outputs.elasticsearch }}
       opensearch: ${{ steps.warden.outputs.opensearch || steps.compute-software-requirements.outputs.opensearch }}
@@ -74,7 +74,7 @@ jobs:
       rabbitmq: ${{ steps.compute-software-requirements.outputs.rabbitmq }}
       activemq_artemis: ${{ steps.compute-software-requirements.outputs.activemq_artemis }}
     steps:
-      # OWNER/REPO/PATH@REF instead of checkout + `uses: ./` - a plain checkout of this
+      # $/ instead of checkout + `uses: ./` - a plain checkout of this
       # step's own repo actually checks out whatever repo is CALLING this reusable workflow,
       # not the repo the workflow file itself lives in (GitHub has no context variable
       # exposing that).
@@ -111,7 +111,7 @@ jobs:
         -v "${{github.workspace}}":"${{github.workspace}}"
     services:
       mysql:
-        image: ${{ needs.compute-software-requirements.outputs.db_distribution }}:${{ needs.compute-software-requirements.outputs.db_version }} # zizmor: ignore[unpinned-images] mysql or mariadb from the .env, tagged by version like the other services
+        image: ${{ needs.compute-software-requirements.outputs.database_image }} # zizmor: ignore[unpinned-images] mysql or mariadb from the .env or the manifest, tagged by version like the other services
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: magento
@@ -119,10 +119,10 @@ jobs:
           - 3306:3306
         options: --tmpfs /tmp:rw --tmpfs /var/lib/mysql:rw --health-cmd="mysqladmin ping --silent || mariadb-admin ping --silent" --health-interval=10s --health-timeout=5s --health-retries=3
       redis:
-        image: redis:${{ needs.compute-software-requirements.outputs.redis }}
+        image: ${{ needs.compute-software-requirements.outputs.cache_image }} # zizmor: ignore[unpinned-images] redis or valkey from the .env or the manifest
         ports:
           - 6379:6379
-        options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=3
+        options: --health-cmd="redis-cli ping || valkey-cli ping" --health-interval=10s --health-timeout=5s --health-retries=3
       elasticsearch:
         image: docker.io/wardenenv/opensearch:${{ needs.compute-software-requirements.outputs.opensearch }}
         ports:

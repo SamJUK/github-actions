@@ -12,6 +12,8 @@ This workflow runs PHPUnit-based tests against a Magento module, using Github Ac
 
 `php_version` overrides the PHP version used for the container image - defaults to whatever's computed for `magento_version`/`magento_distribution`. Useful for a release that officially supports multiple PHP versions and you want to pin/test a specific one.
 
+Database and cache come from the version's [compute-software-requirements](../actions/magento/compute-software-requirements/README.md) entry; MySQL and Redis by default.
+
 ## Usage
 
 Get the version matrix from [magento-supported-versions](./magento-supported-versions.readme.md) rather than hardcoding one, so every consumer picks up support changes automatically:

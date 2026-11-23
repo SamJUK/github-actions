@@ -1,0 +1,111 @@
+name: Test update-magento-versions
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - .github/scripts/bump-magento-versions.sh
+      - .github/scripts/sync-magento-manifest.sh
+      - .github/fixtures/bump-magento-versions/**
+      - .github/fixtures/sync-magento-manifest/**
+      - .github/workflows/_internal-test-update-magento-versions.yaml
+      - .github/workflows/_update-magento-versions.yaml
+  pull_request:
+    paths:
+      - .github/scripts/bump-magento-versions.sh
+      - .github/scripts/sync-magento-manifest.sh
+      - .github/fixtures/bump-magento-versions/**
+      - .github/fixtures/sync-magento-manifest/**
+      - .github/workflows/_internal-test-update-magento-versions.yaml
+      - .github/workflows/_update-magento-versions.yaml
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # 2.4.8-p6 and 3.7.0 are ready. 2.4.7-p11 has no image, 2.4.9-p1 no manifest entry.
+      # 2.4.10 and Mage-OS 4 are new lines.
+      - name: Run against fixtures
+        shell: bash
+        run: |
+          fixtures="$PWD/.github/fixtures/bump-magento-versions"
+          cp "$fixtures/versions.json" "$RUNNER_TEMP/"
+          VERSIONS="$RUNNER_TEMP/versions.json" \
+          MANIFEST="$fixtures/manifest.json" \
+          MAGENTO_PACKAGES="file://$fixtures/magento.json" \
+          MAGEOS_PACKAGES="file://$fixtures/mage-os.json" \
+          IMAGE_TAGS="file://$fixtures/images" \
+          CHANGES_FILE="$RUNNER_TEMP/changes.md" \
+            .github/scripts/bump-magento-versions.sh | tee "$RUNNER_TEMP/output.txt"
+
+      - name: Assert
+        shell: bash
+        run: |
+          fail() { echo "::error::$1"; exit 1; }
+
+          expected=$(jq --indent 4 '.magento[1] = "2.4.8-p6" | .["mage-os"][0] = "3.7.0"' .github/fixtures/bump-magento-versions/versions.json)
+          [[ $(cat "$RUNNER_TEMP/versions.json") == "$expected" ]] || fail "versions.json: $(cat "$RUNNER_TEMP/versions.json")"
+
+          [[ $(wc -l < "$RUNNER_TEMP/changes.md") -eq 2 ]] || fail "changes: $(cat "$RUNNER_TEMP/changes.md")"
+          grep -q 'No image for magento 2.4.7-p11' "$RUNNER_TEMP/output.txt" || fail "no warning for 2.4.7-p11"
+          grep -q 'magento 2.4.9-p1 has no manifest.json entry' "$RUNNER_TEMP/output.txt" || fail "no warning for 2.4.9-p1"
+          grep -q 'magento 2.4.10 is out' "$RUNNER_TEMP/output.txt" || fail "no notice for 2.4.10"
+          grep -q 'mage-os 4 is out' "$RUNNER_TEMP/output.txt" || fail "no notice for Mage-OS 4"
+          if grep -qE '(magento 2\.4\.[789]|mage-os 3) is out' "$RUNNER_TEMP/output.txt"; then
+            fail "notice for a line that's already supported"
+          fi
+
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # See the comments in matrix.yml for what each version covers.
+      - name: Run against fixtures
+        shell: bash
+        run: |
+          fixtures="$PWD/.github/fixtures/sync-magento-manifest"
+          cp "$fixtures/manifest.json" "$RUNNER_TEMP/"
+          export MANIFEST="$RUNNER_TEMP/manifest.json" \
+            MATRIX="file://$fixtures/matrix.yml" \
+            IMAGE_TAGS="file://$fixtures/images"
+          CHANGES_FILE="$RUNNER_TEMP/changes.md" .github/scripts/sync-magento-manifest.sh | tee "$RUNNER_TEMP/output.txt"
+          cp "$MANIFEST" "$RUNNER_TEMP/first.json"
+          CHANGES_FILE="$RUNNER_TEMP/rerun.md" .github/scripts/sync-magento-manifest.sh
+
+      - name: Assert
+        shell: bash
+        run: |
+          fail() { echo "::error::$1"; exit 1; }
+          m="$RUNNER_TEMP/manifest.json"
+
+          jq -e '.magento["2.4.9"] | .mariadb == "12.3" and .database == "mariadb" and .opensearch == "3.0"
+            and .valkey == "8" and (has("cache") | not) and .composer == "2.8" and .rabbitmq == "4.3"' "$m" > /dev/null \
+            || fail "2.4.9: $(jq -c '.magento["2.4.9"]' "$m")"
+          jq -e '.magento["2.4.9-p1"] == .magento["2.4.9"]' "$m" > /dev/null || fail "2.4.9-p1: $(jq -c '.magento["2.4.9-p1"]' "$m")"
+          jq -e '.["mage-os"]["3.6.0"] | .database == "mariadb" and .cache == "valkey"' "$m" > /dev/null \
+            || fail "mage-os 3.6.0: $(jq -c '.["mage-os"]["3.6.0"]' "$m")"
+          jq -e '(.magento | keys) == ["2.4.8-p5", "2.4.9", "2.4.9-p1"] and (.["mage-os"] | keys) == ["3.6.0"]' "$m" > /dev/null \
+            || fail "versions: $(jq -c 'map_values(keys)' "$m")"
+          jq -e '.magento["2.4.8-p5"] | .php == "8.3" and (has("database") or has("cache") | not)' "$m" > /dev/null \
+            || fail "2.4.8-p5: $(jq -c '.magento["2.4.8-p5"]' "$m")"
+
+          [[ $(wc -l < "$RUNNER_TEMP/changes.md") -eq 4 ]] || fail "changes: $(cat "$RUNNER_TEMP/changes.md")"
+          grep -q 'No valkey/valkey:9 image' "$RUNNER_TEMP/output.txt" || fail "no warning for Valkey 9"
+          [[ ! -s $RUNNER_TEMP/rerun.md ]] || fail "second run changed: $(cat "$RUNNER_TEMP/rerun.md")"
+          cmp -s "$RUNNER_TEMP/first.json" "$m" || fail "second run rewrote manifest.json"
