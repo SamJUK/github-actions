@@ -1,0 +1,22 @@
+name: PHP lint
+description: >
+  php -l on every tracked .php and .phtml file, and a well-formedness check on every tracked XML file. Needs PHP
+  (php/setup).
+
+inputs:
+  directory:
+    description: Lint the tracked files under this directory.
+    default: .
+
+runs:
+  using: composite
+  steps:
+    - name: php -l
+      shell: sh
+      working-directory: ${{ inputs.directory }}
+      run: '"$GITHUB_ACTION_PATH/php-lint.sh"'
+    - name: XML
+      if: ${{ !cancelled() }}
+      shell: sh
+      working-directory: ${{ inputs.directory }}
+      run: php "$GITHUB_ACTION_PATH/xml-lint.php"

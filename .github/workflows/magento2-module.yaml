@@ -14,12 +14,12 @@ on:
         type: string
         default: ''
       run_unit_tests:
-        description: 'Run Test/Unit. Turn off for a module with no unit tests'
+        description: 'Run Test/Unit when it exists. A module without one only gets a warning'
         required: false
         type: boolean
         default: true
       run_integration_tests:
-        description: 'Run Test/Integration. Turn off for a module with no integration tests'
+        description: 'Run Test/Integration when it exists. A module without one only gets a warning'
         required: false
         type: boolean
         default: true
@@ -30,34 +30,35 @@ permissions:
 jobs:
   lint:
     name: Linter
-    uses: samjuk/github-actions/.github/workflows/magento2-test-lint.yaml@master
+    uses: $/.github/workflows/magento2-test-lint.yaml
     with:
       directory: ${{ inputs.directory }}
+      php: false # each PHPUnit cell lints on its own PHP
 
   static:
     name: Static Analysis
     needs: lint
-    uses: samjuk/github-actions/.github/workflows/magento2-test-static.yaml@master
+    uses: $/.github/workflows/magento2-test-static.yaml
     with:
       directory: ${{ inputs.directory }}
 
   dependencies:
     name: Dependencies
     needs: lint
-    uses: samjuk/github-actions/.github/workflows/magento2-test-dependencies-module.yaml@master
+    uses: $/.github/workflows/magento2-test-dependencies-module.yaml
     with:
       module_path: ./extensions/${{ github.event.repository.name }}/${{ inputs.directory }}
 
   supported-versions:
     name: Supported Versions
-    uses: samjuk/github-actions/.github/workflows/magento-supported-versions.yaml@master
+    uses: $/.github/workflows/magento-supported-versions.yaml
     with:
       exclude: ${{ inputs.exclude }}
 
   phpunit:
     name: PHPUnit Tests (GHAS)
-    needs: [static, dependencies, supported-versions]
-    uses: samjuk/github-actions/.github/workflows/magento2-test-phpunit-module-ghas.yaml@master
+    needs: supported-versions
+    uses: $/.github/workflows/magento2-test-phpunit-module-ghas.yaml
     with:
       module_path: ./extensions/${{ github.event.repository.name }}/${{ inputs.directory }}
       magento_version: ${{ matrix.version }}
@@ -68,3 +69,19 @@ jobs:
       fail-fast: false
       matrix:
         include: ${{ fromJson(needs.supported-versions.outputs.versions) }}
+
+  # The one check to require in a ruleset: the matrix check names change with every Magento release.
+  required:
+    name: Required
+    if: always()
+    needs: [lint, static, dependencies, supported-versions, phpunit]
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Every job passed
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$NEEDS"
+          jq -e 'all(.[]; .result == "success")' <<< "$NEEDS" > /dev/null
+        env:
+          NEEDS: ${{ toJSON(needs) }}

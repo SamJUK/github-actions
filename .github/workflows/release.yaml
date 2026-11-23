@@ -1,0 +1,30 @@
+name: Release
+
+# On demand only. Locally, bin/release.sh does the same.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print what would be released, tag nothing.
+        type: boolean
+        default: true
+
+permissions: {}
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Release changed families
+        run: bin/release.sh ${{ inputs.dry_run && '--dry-run' || '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
