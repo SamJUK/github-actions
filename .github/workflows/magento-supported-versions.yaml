@@ -13,6 +13,16 @@ on:
         required: false
         type: string
         default: ''
+      php:
+        description: 'PHP versions per Magento release: highest, lowest, boundaries (lowest and highest), all, or a comma-separated list such as 8.3,8.4'
+        required: false
+        type: string
+        default: 'highest'
+      magento_watch_snapshot:
+        description: 'Path, in the calling repository, to a magento.watch facts file to use instead of the live list. Meant for tests.'
+        required: false
+        type: string
+        default: ''
       timeout_minutes:
         description: 'Per-job timeout. Raise it for a large integration suite; the default only exists to stop a hung job running to GitHub''s 360 minute ceiling.'
         required: false
@@ -20,7 +30,7 @@ on:
         default: 60
     outputs:
       versions:
-        description: 'JSON array of {distribution, version} objects, for use in a matrix (fromJson(...))'
+        description: 'JSON array of {distribution, version, php} objects, for use in a matrix (fromJson(...)). php is empty for Mage-OS and included entries.'
         value: ${{ jobs.compute.outputs.versions }}
 
 jobs:
@@ -31,25 +41,77 @@ jobs:
     outputs:
       versions: ${{ steps.compute.outputs.versions }}
     steps:
+      - name: Checkout Snapshot
+        if: inputs.magento_watch_snapshot != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: ${{ inputs.magento_watch_snapshot }}
+          sparse-checkout-cone-mode: false
+
+      - name: Checkout Software Requirements Manifest
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: samjuk/github-actions
+          ref: master
+          path: .samjuk-github-actions
+          persist-credentials: false
+          sparse-checkout: .github/actions/magento/compute-software-requirements/manifest.json
+          sparse-checkout-cone-mode: false
+
+      - name: Fetch Supported Magento Releases
+        id: magento-watch
+        uses: lbajsarowicz/github-action-magento-matrix@4408bf7e120052a67a2ae21ce25344eedb2d3d33 # v1.0.1
+        with:
+          versions: supported-all
+          php: ${{ inputs.php }}
+          max-cells: '200'
+          snapshot: ${{ inputs.magento_watch_snapshot }}
+
       - name: Compute Supported Versions
         id: compute
         shell: bash
         env:
           INCLUDE_INPUT: ${{ inputs.include }}
           EXCLUDE_INPUT: ${{ inputs.exclude }}
+          MAGENTO_WATCH_MATRIX: ${{ steps.magento-watch.outputs.matrix }}
+          MANIFEST: .samjuk-github-actions/.github/actions/magento/compute-software-requirements/manifest.json
         run: |
-          # Single place to bump the org-wide Magento/Mage-OS support matrix on new releases.
-          # Entries are "distribution:version" - Mage-OS versions don't correlate with
-          # Magento's numbering (e.g. 3.6.0 vs 2.4.9), so distribution disambiguates.
-          # 2.4.4 dropped: defaults to search-engine: elasticsearch7/elasticsearch-host,
-          # which the phpunit-* workflows' integration-test config doesn't account for.
-          BASE_ENTRIES=(
-            magento:2.4.9
-            magento:2.4.8-p5
-            magento:2.4.7-p10
-            magento:2.4.6-p15
-            mage-os:3.6.0
+          # magento.watch lists the supported Magento Open Source releases; each release line uses its
+          # newest patch that manifest.json knows, because compute-software-requirements and the CI
+          # images need a manifest entry. Mage-OS is not covered by magento.watch and stays listed here.
+          # Entries are "distribution:version:php" - Mage-OS versions don't correlate with Magento's
+          # numbering (e.g. 3.6.0 vs 2.4.9), so distribution disambiguates.
+          MAGE_OS_ENTRIES=(
+            mage-os:3.6.0:
           )
+
+          mapfile -t SELECTION < <(jq -r --slurpfile manifest "$MANIFEST" '
+            ($manifest[0].magento | keys) as $known
+            | [.include[] | {line, version: .magento, php}]
+            | group_by(.line)
+            | sort_by(.[0].line | split(".") | map(tonumber)) | reverse
+            | .[]
+            | . as $cells
+            | ([$cells[].version] | unique | sort_by((capture("-p(?<p>[0-9]+)$").p // "0") | tonumber) | reverse) as $versions
+            | ($versions | map(IN($known[])) | index(true)) as $i
+            | if $i == null then
+                ($versions[] | "skip \(.)")
+              else
+                ($versions[:$i][] | "skip \(.)"),
+                ($cells | map(select(.version == $versions[$i])) | sort_by(.php | split(".") | map(tonumber)) | .[] | "magento:\(.version):\(.php)")
+              end
+          ' <<< "$MAGENTO_WATCH_MATRIX")
+
+          BASE_ENTRIES=()
+          for line in "${SELECTION[@]}"; do
+            if [[ "$line" == skip\ * ]]; then
+              echo "::warning title=Magento release not in manifest.json::Magento ${line#skip } is supported but has no entry in compute-software-requirements/manifest.json, so the matrix uses the newest patch of its line that has one."
+            else
+              BASE_ENTRIES+=("$line")
+            fi
+          done
+          BASE_ENTRIES+=("${MAGE_OS_ENTRIES[@]}")
 
           # include/exclude lines may be "distribution:version" or a bare version (implies
           # magento, for brevity). exclude also accepts a bare glob (e.g. "2.4.9*") matched
@@ -61,30 +123,34 @@ jobs:
           for line in "${INCLUDE_INPUT_LINES[@]}"; do
             [[ -z "$line" ]] && continue
             if [[ "$line" == *:* ]]; then
-              INCLUDE_ENTRIES+=("$line")
+              INCLUDE_ENTRIES+=("$line:")
             else
-              INCLUDE_ENTRIES+=("magento:$line")
+              INCLUDE_ENTRIES+=("magento:$line:")
             fi
           done
 
           declare -A seen
           ENTRIES=()
-          for e in "${BASE_ENTRIES[@]}" "${INCLUDE_ENTRIES[@]}"; do
-            [[ -z "$e" ]] && continue
-            if [[ -z "${seen[$e]:-}" ]]; then
-              seen[$e]=1
+          for e in "${BASE_ENTRIES[@]}"; do
+            seen[${e%:*}]=1
+            ENTRIES+=("$e")
+          done
+          for e in "${INCLUDE_ENTRIES[@]}"; do
+            if [[ -z "${seen[${e%:*}]:-}" ]]; then
+              seen[${e%:*}]=1
               ENTRIES+=("$e")
             fi
           done
 
           RESULT=()
           for e in "${ENTRIES[@]}"; do
-            version="${e#*:}"
+            distribution_version="${e%:*}"
+            version="${distribution_version#*:}"
             excluded=0
             for pattern in "${EXCLUDE_PATTERNS[@]}"; do
               [[ -z "$pattern" ]] && continue
               if [[ "$pattern" == *:* ]]; then
-                match_against="$e"
+                match_against="$distribution_version"
               else
                 match_against="$version"
               fi
@@ -99,6 +165,6 @@ jobs:
             fi
           done
 
-          JSON=$(printf '%s\n' "${RESULT[@]}" | jq -R 'split(":") | {distribution: .[0], version: .[1]}' | jq -sc .)
+          JSON=$(printf '%s\n' "${RESULT[@]}" | jq -R 'split(":") | {distribution: .[0], version: .[1], php: .[2]}' | jq -sc .)
           echo "Supported versions: $JSON"
           echo "versions=$JSON" >> "$GITHUB_OUTPUT"

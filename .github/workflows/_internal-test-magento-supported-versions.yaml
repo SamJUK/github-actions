@@ -6,10 +6,12 @@ on:
     paths:
       - .github/workflows/magento-supported-versions.yaml
       - .github/workflows/_internal-test-magento-supported-versions.yaml
+      - .github/fixtures/magento-watch-supported.json
   pull_request:
     paths:
       - .github/workflows/magento-supported-versions.yaml
       - .github/workflows/_internal-test-magento-supported-versions.yaml
+      - .github/fixtures/magento-watch-supported.json
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -19,12 +21,23 @@ permissions:
   contents: read
 
 jobs:
+  # The fixture lists 2.4.9-p1, which manifest.json does not know, and no 2.4.6: the 2.4.9 line
+  # must stay on 2.4.9 and the 2.4.6 line must be absent.
   default:
     uses: ./.github/workflows/magento-supported-versions.yaml
+    with:
+      magento_watch_snapshot: .github/fixtures/magento-watch-supported.json
+
+  boundaries:
+    uses: ./.github/workflows/magento-supported-versions.yaml
+    with:
+      magento_watch_snapshot: .github/fixtures/magento-watch-supported.json
+      php: boundaries
 
   include-exclude:
     uses: ./.github/workflows/magento-supported-versions.yaml
     with:
+      magento_watch_snapshot: .github/fixtures/magento-watch-supported.json
       include: |
         2.4.3-p17
         2.4.9-p1
@@ -35,14 +48,18 @@ jobs:
   distribution-scoped:
     uses: ./.github/workflows/magento-supported-versions.yaml
     with:
+      magento_watch_snapshot: .github/fixtures/magento-watch-supported.json
       include: |
         mage-os:2.3.0
       exclude: |
         mage-os:3.6.0
 
+  live:
+    uses: ./.github/workflows/magento-supported-versions.yaml
+
   assert:
     name: Assert
-    needs: [default, include-exclude, distribution-scoped]
+    needs: [default, boundaries, include-exclude, distribution-scoped, live]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -50,7 +67,7 @@ jobs:
         shell: bash
         run: |
           actual="${NEEDS_DEFAULT_OUTPUTS_VERSIONS}"
-          expected='[{"distribution":"magento","version":"2.4.9"},{"distribution":"magento","version":"2.4.8-p5"},{"distribution":"magento","version":"2.4.7-p10"},{"distribution":"magento","version":"2.4.6-p15"},{"distribution":"mage-os","version":"3.6.0"}]'
+          expected='[{"distribution":"magento","version":"2.4.9","php":"8.5"},{"distribution":"magento","version":"2.4.8-p5","php":"8.4"},{"distribution":"magento","version":"2.4.7-p10","php":"8.3"},{"distribution":"mage-os","version":"3.6.0","php":""}]'
           if [[ "$actual" != "$expected" ]]; then
             echo "expected: $expected"
             echo "actual:   $actual"
@@ -58,6 +75,19 @@ jobs:
           fi
         env:
           NEEDS_DEFAULT_OUTPUTS_VERSIONS: ${{ needs.default.outputs.versions }}
+
+      - name: Assert PHP boundaries
+        shell: bash
+        run: |
+          actual="${NEEDS_BOUNDARIES_OUTPUTS_VERSIONS}"
+          expected='[{"distribution":"magento","version":"2.4.9","php":"8.5"},{"distribution":"magento","version":"2.4.8-p5","php":"8.3"},{"distribution":"magento","version":"2.4.8-p5","php":"8.4"},{"distribution":"magento","version":"2.4.7-p10","php":"8.2"},{"distribution":"magento","version":"2.4.7-p10","php":"8.3"},{"distribution":"mage-os","version":"3.6.0","php":""}]'
+          if [[ "$actual" != "$expected" ]]; then
+            echo "expected: $expected"
+            echo "actual:   $actual"
+            exit 1
+          fi
+        env:
+          NEEDS_BOUNDARIES_OUTPUTS_VERSIONS: ${{ needs.boundaries.outputs.versions }}
 
       - name: Assert include/exclude + glob applied
         shell: bash
@@ -68,7 +98,7 @@ jobs:
           # proves glob matching works against base AND included entries, not just exact
           # strings, and that a bare (no distribution) exclude only matches the version part.
           # mage-os:3.6.0 survives untouched - "2.4.9*" doesn't match "3.6.0".
-          expected='[{"distribution":"magento","version":"2.4.7-p10"},{"distribution":"magento","version":"2.4.6-p15"},{"distribution":"mage-os","version":"3.6.0"},{"distribution":"magento","version":"2.4.3-p17"}]'
+          expected='[{"distribution":"magento","version":"2.4.7-p10","php":"8.3"},{"distribution":"mage-os","version":"3.6.0","php":""},{"distribution":"magento","version":"2.4.3-p17","php":""}]'
           if [[ "$actual" != "$expected" ]]; then
             echo "expected: $expected"
             echo "actual:   $actual"
@@ -83,7 +113,7 @@ jobs:
           actual="${NEEDS_DISTRIBUTION_SCOPED_OUTPUTS_VERSIONS}"
           # "mage-os:3.6.0" exact-excluded (distribution-qualified, doesn't touch any
           # magento entry); "mage-os:2.3.0" included the same way.
-          expected='[{"distribution":"magento","version":"2.4.9"},{"distribution":"magento","version":"2.4.8-p5"},{"distribution":"magento","version":"2.4.7-p10"},{"distribution":"magento","version":"2.4.6-p15"},{"distribution":"mage-os","version":"2.3.0"}]'
+          expected='[{"distribution":"magento","version":"2.4.9","php":"8.5"},{"distribution":"magento","version":"2.4.8-p5","php":"8.4"},{"distribution":"magento","version":"2.4.7-p10","php":"8.3"},{"distribution":"mage-os","version":"2.3.0","php":""}]'
           if [[ "$actual" != "$expected" ]]; then
             echo "expected: $expected"
             echo "actual:   $actual"
@@ -91,3 +121,10 @@ jobs:
           fi
         env:
           NEEDS_DISTRIBUTION_SCOPED_OUTPUTS_VERSIONS: ${{ needs.distribution-scoped.outputs.versions }}
+
+      - name: Assert live list has a Magento release
+        shell: bash
+        run: |
+          jq -e 'map(select(.distribution == "magento" and .php != "")) | length > 0' <<< "${NEEDS_LIVE_OUTPUTS_VERSIONS}"
+        env:
+          NEEDS_LIVE_OUTPUTS_VERSIONS: ${{ needs.live.outputs.versions }}
