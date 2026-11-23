@@ -1,6 +1,6 @@
 {
   "name": "samjuk/demo-package-phpstan-magento",
-  "description": "Fixture: a module with its own PHPStan and bitexpert/phpstan-magento, using a generated factory",
+  "description": "Fixture: a module with its own tooling (PHPStan with bitexpert/phpstan-magento, PHPCS from samjuk/dev-standards), using a generated factory",
   "type": "magento2-module",
   "license": "MIT",
   "require": {
@@ -9,7 +9,9 @@
   "require-dev": {
     "bitexpert/phpstan-magento": "^0.44",
     "phpstan/extension-installer": "^1.4",
-    "phpstan/phpstan": "^2.1"
+    "phpstan/phpstan": "^2.1",
+    "magento/magento-coding-standard": "^41.0",
+    "samjuk/dev-standards": "^1.0"
   },
   "repositories": {
     "mage-os": {
@@ -18,13 +20,18 @@
     }
   },
   "autoload": {
-    "files": ["registration.php"],
-    "psr-4": {"SamJUK\\DemoPhpstanMagento\\": ""}
+    "files": [
+      "registration.php"
+    ],
+    "psr-4": {
+      "SamJUK\\DemoPhpstanMagento\\": ""
+    }
   },
   "config": {
     "allow-plugins": {
       "magento/composer-dependency-version-audit-plugin": false,
-      "phpstan/extension-installer": true
+      "phpstan/extension-installer": true,
+      "dealerdirect/phpcodesniffer-composer-installer": true
     }
   }
 }

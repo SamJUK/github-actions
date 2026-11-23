@@ -3,6 +3,8 @@
 This workflow handles performing opinionated static analysis against a Magento 2 module.
 
 PHPCS runs the Magento2 standard from a global install.
+A `.phpcs.xml`, `phpcs.xml`, `.phpcs.xml.dist` or `phpcs.xml.dist` in `directory` wins. Without one it uses a shared ruleset (the Magento2 standard with a few noisy sniffs relaxed), or the plain Magento2 standard with `phpcs_write_config: false`.
+With its own ruleset, the module's dependencies are installed first (a ruleset like samjuk/dev-standards' lives in `vendor`), its `vendor/bin/phpcs` is used when present, and its `<file>` list decides what is checked.
 
 PHPStan runs after `composer update` in `directory` (a module's lock file never reaches a store), so only what the module declares is installed, and a class from an undeclared dependency fails as an unknown class.
 It uses the module's own `vendor/bin/phpstan` when it has one, otherwise a global PHPStan.

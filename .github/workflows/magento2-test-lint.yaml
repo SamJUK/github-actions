@@ -18,6 +18,11 @@ on:
         type: string
         default: "."
         description: "Directory to lint"
+      php:
+        required: false
+        type: boolean
+        default: true
+        description: "Run php -l. magento2-module turns it off and lints in each PHPUnit cell instead, on that cell's PHP"
       timeout_minutes:
         description: 'Per-job timeout. Raise it for a large integration suite; the default only exists to stop a hung job running to GitHub''s 360 minute ceiling.'
         required: false
@@ -50,6 +55,7 @@ jobs:
           INPUTS_DIRECTORY: ${{ inputs.directory }}
 
   php:
+    if: inputs.php
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout_minutes }}
     steps:

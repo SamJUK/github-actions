@@ -65,7 +65,7 @@ jobs:
       # confirmed via a 404 against the first cross-repo consumer to hit this).
       - name: Compute Software Requirements
         id: compute-software-requirements
-        uses: samjuk/github-actions/.github/actions/magento/compute-software-requirements@master
+        uses: $/.github/actions/magento/compute-software-requirements
         with:
           magento_version: ${{ inputs.magento_version }}
           distribution: ${{ inputs.magento_distribution }}
@@ -132,6 +132,12 @@ jobs:
           path: ./extensions/${{ github.event.repository.name }}
           persist-credentials: false
 
+      # On this cell's PHP, so syntax newer than the oldest supported release fails in that release's cell.
+      - name: Lint
+        uses: $/.github/actions/php/lint
+        with:
+          directory: ${{ inputs.module_path }}
+
       - name: Check Test Directories
         id: test-dirs
         run: |
@@ -149,8 +155,7 @@ jobs:
 
           if { [ "${{ inputs.run_unit_tests }}" = "true" ] || [ "${{ inputs.run_integration_tests }}" = "true" ]; } \
              && [ "$UNIT_WILL_RUN" = "false" ] && [ "$INTEGRATION_WILL_RUN" = "false" ]; then
-            echo "::error::Tests were requested (run_unit_tests/run_integration_tests) but neither Test/Unit nor Test/Integration exists at ${INPUTS_MODULE_PATH}."
-            exit 1
+            echo "::warning::Neither Test/Unit nor Test/Integration exists at ${INPUTS_MODULE_PATH}, so only the DI compile runs."
           fi
         env:
           INPUTS_MODULE_PATH: ${{ inputs.module_path }}

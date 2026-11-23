@@ -1,8 +1,8 @@
 # Magento 2 Test PHPUnit Module (Github Actions Services)
 
-This workflow runs PHPUnit-based tests against a Magento module, using Github Actions Services. `setup:di:compile` always runs after install. Unit and integration tests are each opt-in via `run_unit_tests`/`run_integration_tests` (both default `false`).
+This workflow runs PHPUnit-based tests against a Magento module, using Github Actions Services. It first runs `php -l` and an XML check on the module with the PHP of the image it runs in. `setup:di:compile` always runs after install. Unit and integration tests are each opt-in via `run_unit_tests`/`run_integration_tests` (both default `false`).
 
-**Recommended: set both to `true` always**, even if the module doesn't have one of the two test types yet. The workflow checks whether `Test/Unit`/`Test/Integration` actually exist and skips whichever is missing, so there's no CI wiring to come back and update later when you add the other one — it just starts running. If *neither* directory exists despite both being requested, the job fails loudly instead of silently reporting green with zero tests run (almost certainly a misconfigured `module_path`, not an intentional "no tests" module).
+**Recommended: set both to `true` always**, even if the module doesn't have one of the two test types yet. The workflow checks whether `Test/Unit`/`Test/Integration` actually exist and skips whichever is missing, so there's no CI wiring to come back and update later when you add the other one — it just starts running. If *neither* directory exists despite both being requested, the job warns and runs only the DI compile.
 
 `module_path` (default: `./extensions/${{ github.event.repository.name }}`) points at the checked-out module's own directory — override it if the module composer.json lives somewhere other than the checkout root (e.g. a fixture in a monorepo). `Test/Unit` and `Test/Integration` are always expected as subdirectories of `module_path`, per Magento's standard module layout — there's no separate override for these.
 

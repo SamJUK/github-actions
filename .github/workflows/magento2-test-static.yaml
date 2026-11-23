@@ -27,7 +27,7 @@ on:
         required: false
         type: boolean
         default: true
-        description: "Whether to write a shared PHPCS config file"
+        description: "Use the shared PHPCS ruleset when the module has no phpcs.xml(.dist) or .phpcs.xml(.dist) of its own. Off runs the plain Magento2 standard"
       phpstan_level:
         required: false
         type: string
@@ -75,10 +75,27 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Create shared PHPCS ruleset
-        if: ${{ inputs.phpcs_write_config }}
+      # The module's own config wins. The shared ruleset goes to the runner's temp directory, never over a tracked file.
+      - name: Choose PHPCS ruleset
+        id: ruleset
+        working-directory: ${{ inputs.directory }}
+        env:
+          INPUTS_PHPCS_WRITE_CONFIG: ${{ inputs.phpcs_write_config }}
         run: |
-          cat <<'EOF' > phpcs.xml
+          for f in .phpcs.xml phpcs.xml .phpcs.xml.dist phpcs.xml.dist; do
+            if [ -f "$f" ]; then
+              echo "Using the module's $f"
+              echo "standard=$PWD/$f" >> "$GITHUB_OUTPUT"
+              echo "own=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          if [ "$INPUTS_PHPCS_WRITE_CONFIG" != true ]; then
+            echo "standard=Magento2" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "standard=$RUNNER_TEMP/phpcs.xml" >> "$GITHUB_OUTPUT"
+          cat <<'EOF' > "$RUNNER_TEMP/phpcs.xml"
           <?xml version="1.0"?>
           <ruleset name="Magento2 Shared Rules">
       
@@ -121,11 +138,27 @@ jobs:
           </ruleset>
           EOF
 
-      - name: Run PHPCS
-        run: |
-          phpcs --standard=phpcs.xml --extensions=php,phtml -p "${INPUTS_DIRECTORY}" --severity="${INPUTS_PHPCS_SEVERITY}"
+      # A module's own ruleset usually builds on a dev dependency (samjuk/dev-standards refers to ./vendor/...).
+      - name: Install Module Dependencies
+        if: ${{ steps.ruleset.outputs.own == 'true' }}
+        working-directory: ${{ inputs.directory }}
         env:
-          INPUTS_DIRECTORY: ${{ inputs.directory }}
+          COMPOSER_NO_SECURITY_BLOCKING: 1
+        run: composer update --no-interaction --no-progress
+
+      # The module's own phpcs and <file> list win when it has them.
+      - name: Run PHPCS
+        working-directory: ${{ inputs.directory }}
+        run: |
+          PHPCS=phpcs
+          [ -x vendor/bin/phpcs ] && PHPCS=vendor/bin/phpcs
+          FILES=.
+          [ "$OWN" = true ] && grep -qs '<file>' "$STANDARD" && FILES=
+          # shellcheck disable=SC2086 # FILES is . or nothing.
+          "$PHPCS" --standard="${STANDARD}" --extensions=php,phtml --ignore='*/vendor/*' -p --severity="${INPUTS_PHPCS_SEVERITY}" $FILES
+        env:
+          STANDARD: ${{ steps.ruleset.outputs.standard }}
+          OWN: ${{ steps.ruleset.outputs.own }}
           INPUTS_PHPCS_SEVERITY: ${{ inputs.phpcs_severity }}
 
   phpstan:
