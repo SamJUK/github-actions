@@ -4,12 +4,17 @@ on:
   push:
     branches: [master]
     paths:
+      - .github/actions/magento/supported-versions/**
+      - .github/actions/magento/compute-software-requirements/manifest.json
       - .github/workflows/magento-supported-versions.yaml
       - .github/workflows/_internal-test-magento-supported-versions.yaml
   pull_request:
     paths:
+      - .github/actions/magento/supported-versions/**
+      - .github/actions/magento/compute-software-requirements/manifest.json
       - .github/workflows/magento-supported-versions.yaml
       - .github/workflows/_internal-test-magento-supported-versions.yaml
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -19,75 +24,72 @@ permissions:
   contents: read
 
 jobs:
-  default:
-    uses: ./.github/workflows/magento-supported-versions.yaml
-
-  include-exclude:
+  # The reusable workflow only passes its inputs through to the action.
+  workflow:
     uses: ./.github/workflows/magento-supported-versions.yaml
     with:
-      include: |
-        2.4.3-p17
-        2.4.9-p1
-      exclude: |
-        2.4.8-p5
-        2.4.9*
+      include: 2.4.3-p17
+      exclude: mage-os:*
 
-  distribution-scoped:
-    uses: ./.github/workflows/magento-supported-versions.yaml
-    with:
-      include: |
-        mage-os:2.3.0
-      exclude: |
-        mage-os:3.6.0
-
-  assert:
-    name: Assert
-    needs: [default, include-exclude, distribution-scoped]
+  test:
+    name: Test
+    needs: workflow
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Assert default list
-        shell: bash
-        run: |
-          actual="${NEEDS_DEFAULT_OUTPUTS_VERSIONS}"
-          expected='[{"distribution":"magento","version":"2.4.9"},{"distribution":"magento","version":"2.4.8-p5"},{"distribution":"magento","version":"2.4.7-p10"},{"distribution":"magento","version":"2.4.6-p15"},{"distribution":"mage-os","version":"3.6.0"}]'
-          if [[ "$actual" != "$expected" ]]; then
-            echo "expected: $expected"
-            echo "actual:   $actual"
-            exit 1
-          fi
-        env:
-          NEEDS_DEFAULT_OUTPUTS_VERSIONS: ${{ needs.default.outputs.versions }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - name: Assert include/exclude + glob applied
-        shell: bash
-        run: |
-          actual="${NEEDS_INCLUDE_EXCLUDE_OUTPUTS_VERSIONS}"
-          # magento:2.4.8-p5 dropped by exact (bare, version-only) exclude; base "2.4.9"
-          # and the just-included "2.4.9-p1" both dropped by the "2.4.9*" glob exclude -
-          # proves glob matching works against base AND included entries, not just exact
-          # strings, and that a bare (no distribution) exclude only matches the version part.
-          # mage-os:3.6.0 survives untouched - "2.4.9*" doesn't match "3.6.0".
-          expected='[{"distribution":"magento","version":"2.4.7-p10"},{"distribution":"magento","version":"2.4.6-p15"},{"distribution":"mage-os","version":"3.6.0"},{"distribution":"magento","version":"2.4.3-p17"}]'
-          if [[ "$actual" != "$expected" ]]; then
-            echo "expected: $expected"
-            echo "actual:   $actual"
-            exit 1
-          fi
-        env:
-          NEEDS_INCLUDE_EXCLUDE_OUTPUTS_VERSIONS: ${{ needs.include-exclude.outputs.versions }}
+      - name: Default list
+        id: default
+        uses: ./.github/actions/magento/supported-versions
 
-      - name: Assert distribution-qualified include/exclude
+      - name: Bare include/exclude and globs
+        id: globs
+        uses: ./.github/actions/magento/supported-versions
+        with:
+          include: |
+            2.4.3-p17
+            2.4.2
+            2.4.99-p1
+          exclude: |
+            2.4.2
+            2.4.99*
+            mage-os:*
+
+      - name: Distribution-qualified include/exclude
+        id: scoped
+        uses: ./.github/actions/magento/supported-versions
+        with:
+          include: |
+            mage-os:2.3.0
+            mage-os:2.2.0
+          exclude: |
+            mage-os:2.2.0
+
+      # Expected lists are built from versions.json so patch bumps don't need test edits.
+      - name: Assert
         shell: bash
-        run: |
-          actual="${NEEDS_DISTRIBUTION_SCOPED_OUTPUTS_VERSIONS}"
-          # "mage-os:3.6.0" exact-excluded (distribution-qualified, doesn't touch any
-          # magento entry); "mage-os:2.3.0" included the same way.
-          expected='[{"distribution":"magento","version":"2.4.9"},{"distribution":"magento","version":"2.4.8-p5"},{"distribution":"magento","version":"2.4.7-p10"},{"distribution":"magento","version":"2.4.6-p15"},{"distribution":"mage-os","version":"2.3.0"}]'
-          if [[ "$actual" != "$expected" ]]; then
-            echo "expected: $expected"
-            echo "actual:   $actual"
-            exit 1
-          fi
         env:
-          NEEDS_DISTRIBUTION_SCOPED_OUTPUTS_VERSIONS: ${{ needs.distribution-scoped.outputs.versions }}
+          VERSIONS: .github/actions/magento/supported-versions/versions.json
+          MANIFEST: .github/actions/magento/compute-software-requirements/manifest.json
+          DEFAULT: ${{ steps.default.outputs.versions }}
+          GLOBS: ${{ steps.globs.outputs.versions }}
+          SCOPED: ${{ steps.scoped.outputs.versions }}
+          WORKFLOW: ${{ needs.workflow.outputs.versions }}
+        run: |
+          fail() { echo "::error::$*"; exit 1; }
+          check() {
+            local name=$1 actual=$2 expected
+            expected=$(jq -c "[to_entries[] | .key as \$d | .value[] | {distribution: \$d, version: .}] | $3" "$VERSIONS")
+            [[ $actual == "$expected" ]] || fail "$name: expected $expected, got $actual"
+          }
+
+          check default "$DEFAULT" '.'
+          check globs "$GLOBS" 'map(select(.distribution == "magento")) + [{distribution: "magento", version: "2.4.3-p17"}]'
+          check scoped "$SCOPED" '. + [{distribution: "mage-os", version: "2.3.0"}]'
+          check workflow "$WORKFLOW" 'map(select(.distribution == "magento")) + [{distribution: "magento", version: "2.4.3-p17"}]'
+
+          missing=$(jq -r --slurpfile m "$MANIFEST" 'to_entries[] | .key as $d | .value[] | select($m[0][$d][.] == null) | "\($d):\(.)"' "$VERSIONS")
+          [[ -z $missing ]] || fail "no compute-software-requirements entry for: $missing"

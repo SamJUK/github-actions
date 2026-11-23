@@ -1,0 +1,39 @@
+{
+    "magento": {
+        "2.4.9": {
+            "composer": "2.8",
+            "php": "8.5",
+            "mysql": "8.4",
+            "mariadb": "11.4",
+            "opensearch": "3.0",
+            "redis": "7.2",
+            "valkey": "8",
+            "rabbitmq": "4.1",
+            "varnish": "7.7"
+        },
+        "2.4.8-p5": {
+            "composer": "2.8",
+            "php": "8.4",
+            "mysql": "8.4",
+            "mariadb": "11.4",
+            "opensearch": "3.0",
+            "redis": "7.2",
+            "valkey": "8",
+            "rabbitmq": "4.1",
+            "varnish": "7.7"
+        }
+    },
+    "mage-os": {
+        "3.6.0": {
+            "composer": "2.8",
+            "php": "8.5",
+            "mysql": "8.4",
+            "mariadb": "11.4",
+            "opensearch": "3.0",
+            "redis": "7.2",
+            "valkey": "8",
+            "rabbitmq": "4.1",
+            "varnish": "7.7"
+        }
+    }
+}

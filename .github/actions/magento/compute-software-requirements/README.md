@@ -2,6 +2,9 @@
 
 A Github Action to handle computing software requirements for use with a certain version of Magento.
 
+Versions live in `manifest.json`, synced weekly from [magento-compatability](https://github.com/SamJUK/magento-compatability).
+`database` and `cache` choose the PHPUnit services; MySQL and Redis when unset.
+
 ## Inputs
 
 See the [action.yaml](./action.yaml)

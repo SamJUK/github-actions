@@ -51,6 +51,18 @@ outputs:
   activemq_artemis:
     description: "ActiveMQ Artemis Version"
     value: ${{ steps.extract-software-requirements.outputs.activemq_artemis }}
+  database:
+    description: "Database to test against: mariadb or mysql"
+    value: ${{ steps.extract-software-requirements.outputs.database || 'mysql' }}
+  database_image:
+    description: "Docker image for the database service"
+    value: ${{ steps.extract-software-requirements.outputs.database == 'mariadb' && format('mariadb:{0}', steps.extract-software-requirements.outputs.mariadb) || format('mysql:{0}', steps.extract-software-requirements.outputs.mysql) }}
+  cache:
+    description: "Cache to test against: valkey or redis"
+    value: ${{ steps.extract-software-requirements.outputs.cache || 'redis' }}
+  cache_image:
+    description: "Docker image for the cache service"
+    value: ${{ steps.extract-software-requirements.outputs.cache == 'valkey' && format('valkey/valkey:{0}', steps.extract-software-requirements.outputs.valkey) || format('redis:{0}', steps.extract-software-requirements.outputs.redis) }}
 
 runs:
   using: composite

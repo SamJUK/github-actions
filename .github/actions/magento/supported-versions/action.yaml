@@ -1,0 +1,80 @@
+name: "Magento Supported Versions"
+author: "SamJUK"
+description: "The Magento and Mage-OS versions we build and test our modules against"
+
+inputs:
+  include:
+    description: 'Extra versions to test against, one per line ("distribution:version", or a bare Magento version)'
+    required: false
+    default: ''
+  exclude:
+    description: 'Versions to drop, one per line. Accepts globs, e.g. "2.4.9*"'
+    required: false
+    default: ''
+
+outputs:
+  versions:
+    description: 'JSON array of {distribution, version} objects, for use in a matrix (fromJson(...))'
+    value: ${{ steps.compute.outputs.versions }}
+
+runs:
+  using: composite
+  steps:
+    - name: Compute Supported Versions
+      id: compute
+      shell: bash
+      env:
+        INCLUDE_INPUT: ${{ inputs.include }}
+        EXCLUDE_INPUT: ${{ inputs.exclude }}
+      run: |
+        mapfile -t BASE_ENTRIES < <(jq -r 'to_entries[] | .key as $d | .value[] | "\($d):\(.)"' "$GITHUB_ACTION_PATH/versions.json")
+
+        # Lines are distribution:version, or a bare version (magento). exclude also takes a version glob.
+        mapfile -t INCLUDE_INPUT_LINES <<< "$INCLUDE_INPUT"
+        mapfile -t EXCLUDE_PATTERNS <<< "$EXCLUDE_INPUT"
+
+        INCLUDE_ENTRIES=()
+        for line in "${INCLUDE_INPUT_LINES[@]}"; do
+          [[ -z "$line" ]] && continue
+          if [[ "$line" == *:* ]]; then
+            INCLUDE_ENTRIES+=("$line")
+          else
+            INCLUDE_ENTRIES+=("magento:$line")
+          fi
+        done
+
+        declare -A seen
+        ENTRIES=()
+        for e in "${BASE_ENTRIES[@]}" "${INCLUDE_ENTRIES[@]}"; do
+          [[ -z "$e" ]] && continue
+          if [[ -z "${seen[$e]:-}" ]]; then
+            seen[$e]=1
+            ENTRIES+=("$e")
+          fi
+        done
+
+        RESULT=()
+        for e in "${ENTRIES[@]}"; do
+          version="${e#*:}"
+          excluded=0
+          for pattern in "${EXCLUDE_PATTERNS[@]}"; do
+            [[ -z "$pattern" ]] && continue
+            if [[ "$pattern" == *:* ]]; then
+              match_against="$e"
+            else
+              match_against="$version"
+            fi
+            # shellcheck disable=SC2053 # unquoted on purpose: enables glob patterns like "2.4.9*"
+            if [[ "$match_against" == $pattern ]]; then
+              excluded=1
+              break
+            fi
+          done
+          if [[ "$excluded" -eq 0 ]]; then
+            RESULT+=("$e")
+          fi
+        done
+
+        JSON=$(printf '%s\n' "${RESULT[@]}" | jq -R 'split(":") | {distribution: .[0], version: .[1]}' | jq -sc .)
+        echo "Supported versions: $JSON"
+        echo "versions=$JSON" >> "$GITHUB_OUTPUT"
