@@ -72,9 +72,10 @@ jobs:
 
       - name: Lint PHP Files
         run: |
-          set +e
-          find "${INPUTS_DIRECTORY}" -type f -name '*.php' -exec php -l {} \; 2>&1 | grep -v "^No syntax errors detected"
-          test $? -eq 0 && exit 1 || exit 0
+          # Exit code, not output: deprecation notices print but aren't errors.
+          # shellcheck disable=SC2016 # $1 expands in the inner sh, not here.
+          find "${INPUTS_DIRECTORY}" -type f -name '*.php' -print0 \
+            | xargs -0 -n1 sh -c 'php -d display_errors=stderr -d log_errors=0 -l "$1" >/dev/null || exit 1' _
         env:
           INPUTS_DIRECTORY: ${{ inputs.directory }}
 

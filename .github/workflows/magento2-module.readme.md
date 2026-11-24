@@ -12,6 +12,10 @@ on:
   pull_request:
     branches: [master]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ci:
     uses: samjuk/github-actions/.github/workflows/magento2-module.yaml@<sha> # magento-module/v1.0.0

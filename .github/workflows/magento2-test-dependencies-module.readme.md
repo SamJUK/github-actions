@@ -54,4 +54,4 @@ jobs:
     uses: samjuk/github-actions/.github/workflows/magento2-test-dependencies-module.yaml@master
 ```
 
-It runs alongside static analysis, before the version matrix.
+It runs once lint passes, alongside static analysis and the version matrix.

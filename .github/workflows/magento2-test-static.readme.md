@@ -24,9 +24,9 @@ on:
 jobs:
     lint:
         name: Linter
-        uses: samjuk/github-actions/.github/workflows/magento2-test-lint@master
+        uses: samjuk/github-actions/.github/workflows/magento2-test-lint.yaml@master
     static-analysis:
         name: Static Analysis
         needs: lint
-        uses: samjuk/github-actions/.github/workflows/magento2-test-static@master
+        uses: samjuk/github-actions/.github/workflows/magento2-test-static.yaml@master
 ```

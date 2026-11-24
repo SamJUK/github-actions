@@ -15,5 +15,5 @@ on:
 jobs:
     lint:
         name: Linter
-        uses: samjuk/github-actions/.github/workflows/magento2-test-lint@master
+        uses: samjuk/github-actions/.github/workflows/magento2-test-lint.yaml@master
 ```

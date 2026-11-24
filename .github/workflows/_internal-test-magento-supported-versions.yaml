@@ -68,6 +68,15 @@ jobs:
           exclude: |
             mage-os:2.2.0
 
+      - name: Everything excluded
+        id: none
+        continue-on-error: true
+        uses: ./.github/actions/magento/supported-versions
+        with:
+          exclude: |
+            magento:*
+            mage-os:*
+
       # Expected lists are built from versions.json so patch bumps don't need test edits.
       - name: Assert
         shell: bash
@@ -78,6 +87,7 @@ jobs:
           GLOBS: ${{ steps.globs.outputs.versions }}
           SCOPED: ${{ steps.scoped.outputs.versions }}
           WORKFLOW: ${{ needs.workflow.outputs.versions }}
+          NONE: ${{ steps.none.outcome }}
         run: |
           fail() { echo "::error::$*"; exit 1; }
           check() {
@@ -90,6 +100,8 @@ jobs:
           check globs "$GLOBS" 'map(select(.distribution == "magento")) + [{distribution: "magento", version: "2.4.3-p17"}]'
           check scoped "$SCOPED" '. + [{distribution: "mage-os", version: "2.3.0"}]'
           check workflow "$WORKFLOW" 'map(select(.distribution == "magento")) + [{distribution: "magento", version: "2.4.3-p17"}]'
+
+          [[ "$NONE" == failure ]] || fail "everything excluded: expected the step to fail, got $NONE"
 
           missing=$(jq -r --slurpfile m "$MANIFEST" 'to_entries[] | .key as $d | .value[] | select($m[0][$d][.] == null) | "\($d):\(.)"' "$VERSIONS")
           [[ -z $missing ]] || fail "no compute-software-requirements entry for: $missing"

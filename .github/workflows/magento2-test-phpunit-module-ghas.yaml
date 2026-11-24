@@ -41,6 +41,7 @@ on:
 
 jobs:
   compute-software-requirements:
+    name: Requirements ${{ inputs.magento_distribution }} ${{ inputs.magento_version }}
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout_minutes }}
     outputs:
@@ -74,7 +75,7 @@ jobs:
 
 
   phpunit-test:
-    name: PHPUnit Test
+    name: PHPUnit ${{ inputs.magento_distribution }} ${{ inputs.magento_version }}, PHP ${{ inputs.php_version || needs.compute-software-requirements.outputs.php }}
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout_minutes }}
     needs: compute-software-requirements
@@ -116,7 +117,7 @@ jobs:
           # with security on, and status:green once disabled - this is what was actually
           # behind "No alive nodes found in your cluster" during setup:install.
           'DISABLE_SECURITY_PLUGIN': 'true'
-        options: --health-cmd="curl localhost:9200/_cluster/health?wait_for_status=yellow&timeout=60s" --health-start-period=7s --health-interval=10s --health-timeout=5s --health-retries=3
+        options: --health-cmd="curl -fs localhost:9200/_cluster/health?wait_for_status=yellow&timeout=60s" --health-start-period=7s --health-interval=10s --health-timeout=5s --health-retries=3
     steps:
       # https://github.com/actions/runner/issues/878#issuecomment-1290921350
       - name: Github Jank
@@ -169,7 +170,7 @@ jobs:
         run: |
           EXT_NAME=$(jq -r '.name' "${INPUTS_MODULE_PATH}/composer.json")
           composer config repositories.local path "${INPUTS_MODULE_PATH}"
-          composer require -W --prefer-source "${EXT_NAME}:@dev"
+          composer require --prefer-source "${EXT_NAME}:@dev"
 
       - name: Detect PHPUnit Flags
         id: phpunit-flags
