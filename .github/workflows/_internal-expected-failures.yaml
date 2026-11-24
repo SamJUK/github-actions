@@ -1,0 +1,47 @@
+name: Expected failures
+run-name: Expected failures ${{ inputs.nonce }}
+
+# Every job here must fail. _internal-test-expected-failures.yaml dispatches it and checks that each did, for the
+# planted reason, while the checks around it passed.
+on:
+  pull_request:  # TEMP: registers the workflow so it can be dispatched, removed before merge
+  workflow_dispatch:
+    inputs:
+      nonce:
+        description: Names the run so the dispatcher can find it
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    uses: ./.github/workflows/magento2-test-lint.yaml
+    with:
+      directory: .github/fixtures/broken-lint
+
+  phpcs:
+    uses: ./.github/workflows/magento2-test-static.yaml
+    with:
+      directory: .github/fixtures/broken-phpcs
+
+  phpstan:
+    uses: ./.github/workflows/magento2-test-static.yaml
+    with:
+      directory: .github/fixtures/broken-phpstan
+
+  dependencies:
+    uses: ./.github/workflows/magento2-test-dependencies-module.yaml
+    with:
+      module_path: ./extensions/${{ github.event.repository.name }}/.github/fixtures/broken-dependencies
+
+  module:
+    uses: ./.github/workflows/magento2-module.yaml
+    with:
+      directory: .github/fixtures/broken-phpcs
+      exclude: |
+        2.4.6*
+        2.4.7*
+        2.4.8*
+        mage-os:*
