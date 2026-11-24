@@ -76,7 +76,7 @@ jobs:
           echo "MODULE_NAME=$MODULE_NAME" >> "$GITHUB_ENV"
           composer config repositories.local path "$MODULE_PATH"
           # ponytail: pinned exactly, it runs inside CI with the module's code
-          composer require -W --prefer-source "${EXT_NAME}:@dev" yireo/magento2-extensionchecker:2.6.1
+          composer require --prefer-source "${EXT_NAME}:@dev" yireo/magento2-extensionchecker:2.6.1
           # Some images point the cache at a Redis host this job does not have; fall back to files.
           # shellcheck disable=SC2016 # PHP code, not shell
           php -r '$f = "app/etc/env.php"; $c = include $f; unset($c["cache"]); file_put_contents($f, "<?php\nreturn " . var_export($c, true) . ";\n");'

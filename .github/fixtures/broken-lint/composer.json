@@ -1,0 +1,6 @@
+{
+    "name": "Not A Valid Package Name",
+    "description": "Self-test fixture: composer validate must fail on it",
+    "type": "magento2-module",
+    "license": "MIT"
+}

@@ -1,0 +1,88 @@
+name: Test expected failures
+
+on:
+  push:
+    branches: [master]
+    paths: &paths
+      - .github/actions/magento/**
+      - .github/actions/php/lint/**
+      - .github/fixtures/broken-*/**
+      - .github/workflows/magento2-module.yaml
+      - .github/workflows/magento2-test-dependencies-module.yaml
+      - .github/workflows/magento2-test-lint.yaml
+      - .github/workflows/magento2-test-phpunit-module-ghas.yaml
+      - .github/workflows/magento2-test-static.yaml
+      - .github/workflows/_internal-expected-failures.yaml
+      - .github/workflows/_internal-test-expected-failures.yaml
+  pull_request:
+    paths: *paths
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    # Dispatching needs a token that can write to Actions, which a fork's pull request never gets.
+    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      actions: write
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Run the expected failures
+        id: run
+        env:
+          REF: ${{ github.head_ref || github.ref_name }}
+          NONCE: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          gh workflow run _internal-expected-failures.yaml --ref "$REF" -f nonce="$NONCE"
+          for _ in $(seq 30); do
+            id=$(gh run list -w _internal-expected-failures.yaml -b "$REF" --json databaseId,displayTitle \
+              -q ".[] | select(.displayTitle == \"Expected failures $NONCE\") | .databaseId")
+            [ -n "$id" ] && break
+            sleep 10
+          done
+          [ -n "$id" ] || { echo "::error::The dispatched run never appeared"; exit 1; }
+          echo "Run: $GITHUB_SERVER_URL/$GH_REPO/actions/runs/$id"
+          until [ "$(gh run view "$id" --json status -q .status)" = completed ]; do sleep 30; done
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
+      # Each failure must be the planted one, and the checks beside it must still pass.
+      - name: Assert
+        env:
+          ID: ${{ steps.run.outputs.id }}
+        run: |
+          gh run view "$ID" --json jobs -q '.jobs[] | "\(.conclusion) \(.name)"' | tee jobs.txt
+          gh run view "$ID" --log-failed > failed.log
+          fail=0
+          expect() { grep -qE "^$1 $2\$" jobs.txt || { echo "::error::Expected $1: $2"; fail=1; }; }
+          logged() { grep -qF "$1" failed.log || { echo "::error::No \"$1\" in the failed logs"; fail=1; }; }
+
+          expect failure 'lint / composer'
+          expect failure 'lint / yaml'
+          expect success 'lint / xml'
+          expect success 'lint / php'
+          expect failure 'phpcs / phpcs'
+          expect success 'phpcs / phpstan'
+          expect failure 'phpstan / phpstan'
+          expect success 'phpstan / phpcs'
+          expect failure 'dependencies / ExtensionChecker'
+          expect failure 'module / Static Analysis / phpcs'
+          expect success 'module / PHPUnit .* / PHPUnit .*'
+          expect failure 'module / Required'
+
+          logged 'does not match the expected JSON schema'
+          logged 'syntax error'
+          logged 'md5() is forbidden'
+          logged 'should return int but returns string'
+          logged 'No composer dependency found for "magento/module-catalog"'
+          exit $fail
