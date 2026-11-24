@@ -53,6 +53,7 @@ runs:
           fi
         done
 
+        declare -A used
         RESULT=()
         for e in "${ENTRIES[@]}"; do
           version="${e#*:}"
@@ -66,6 +67,7 @@ runs:
             fi
             # shellcheck disable=SC2053 # unquoted on purpose: enables glob patterns like "2.4.9*"
             if [[ "$match_against" == $pattern ]]; then
+              used[$pattern]=1
               excluded=1
               break
             fi
@@ -74,6 +76,14 @@ runs:
             RESULT+=("$e")
           fi
         done
+
+        for pattern in "${EXCLUDE_PATTERNS[@]}"; do
+          [[ -n "$pattern" && -z "${used[$pattern]:-}" ]] && echo "::warning::exclude \"$pattern\" matched no version. Versions include the patch level, so try \"$pattern*\""
+        done
+        if [[ ${#RESULT[@]} -eq 0 ]]; then
+          echo "::error::Every version is excluded, so there is nothing to test"
+          exit 1
+        fi
 
         JSON=$(printf '%s\n' "${RESULT[@]}" | jq -R 'split(":") | {distribution: .[0], version: .[1]}' | jq -sc .)
         echo "Supported versions: $JSON"

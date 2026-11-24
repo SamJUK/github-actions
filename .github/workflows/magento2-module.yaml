@@ -14,12 +14,12 @@ on:
         type: string
         default: ''
       run_unit_tests:
-        description: 'Run Test/Unit when it exists. A module without one only gets a warning'
+        description: 'Run Test/Unit when it exists'
         required: false
         type: boolean
         default: true
       run_integration_tests:
-        description: 'Run Test/Integration when it exists. A module without one only gets a warning'
+        description: 'Run Test/Integration when it exists'
         required: false
         type: boolean
         default: true
