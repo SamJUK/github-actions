@@ -4,7 +4,6 @@ run-name: Expected failures ${{ inputs.nonce }}
 # Every job here must fail. _internal-test-expected-failures.yaml dispatches it and checks that each did, for the
 # planted reason, while the checks around it passed.
 on:
-  pull_request:  # TEMP: registers the workflow so it can be dispatched, removed before merge
   workflow_dispatch:
     inputs:
       nonce:
