@@ -6,6 +6,7 @@ It's our list, not Adobe's, so it can keep a version Adobe has dropped.
 - **The list:** [`versions.json`](../actions/magento/supported-versions/versions.json). Each version needs a [compute-software-requirements](../actions/magento/compute-software-requirements/README.md) entry; the self-test checks.
 - **Updates:** `_update-magento-versions.yaml` opens a PR on Mondays, or when run by hand. It syncs the requirements from [magento-compatability](https://github.com/SamJUK/magento-compatability) and moves each version to its newest patch that has a CI image. New release lines are logged, not added.
 - **Per module:** `include` adds `distribution:version` (a bare version means `magento`). `exclude` also takes a version glob, e.g. `2.4.9*`.
+- **Not tested:** Adobe Commerce extended support patches (e.g. 2.4.4-p14, 2.4.5-p15). compute-software-requirements has their requirements, but they're not on the public mirrors, so there's no CI image and [magento.works](https://magento.works/) can't confirm them.
 - **2.4.4** is left out: it defaults to Elasticsearch 7, which the integration test config doesn't handle.
 
 ## Usage

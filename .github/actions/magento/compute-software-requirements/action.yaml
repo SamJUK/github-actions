@@ -71,6 +71,10 @@ runs:
       id: extract-software-requirements
       shell: bash
       run: |
+        if ! jq -e --arg d "$INPUTS_DISTRIBUTION" --arg v "$INPUTS_MAGENTO_VERSION" '.[$d][$v]' ${{ github.action_path }}/manifest.json >/dev/null; then
+          echo "::error::$INPUTS_DISTRIBUTION $INPUTS_MAGENTO_VERSION isn't in manifest.json"
+          exit 1
+        fi
         jq -r --arg d ${INPUTS_DISTRIBUTION} --arg v ${INPUTS_MAGENTO_VERSION} '.[$d][$v] | to_entries | map("\(.key)=\(.value|tostring)") | .[]' ${{ github.action_path }}/manifest.json >> "$GITHUB_OUTPUT"
       env:
         INPUTS_DISTRIBUTION: ${{ inputs.distribution }}
